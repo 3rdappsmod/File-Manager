@@ -139,6 +139,7 @@ dependencies {
     implementation(libs.fossify.commons)
     implementation(libs.androidx.documentfile)
     implementation(libs.androidx.swiperefreshlayout)
+    implementation(libs.androidx.media)
     implementation(libs.roottools)
     implementation(libs.rootshell)
     implementation(libs.gestureviews)

@@ -5,20 +5,23 @@ import android.content.Intent
 import androidx.core.content.FileProvider
 import org.fossify.commons.activities.BaseSimpleActivity
 import org.fossify.commons.extensions.getFilenameFromPath
-import org.fossify.commons.extensions.getMimeTypeFromUri
 import org.fossify.commons.extensions.getParentPath
+import org.fossify.commons.extensions.getMimeTypeFromUri
+import org.fossify.commons.extensions.isAudioFast
 import org.fossify.commons.extensions.launchActivityIntent
 import org.fossify.commons.extensions.openPathIntent
 import org.fossify.commons.extensions.renameFile
 import org.fossify.commons.extensions.setAsIntent
 import org.fossify.commons.extensions.sharePathsIntent
 import org.fossify.filemanager.BuildConfig
+import org.fossify.filemanager.activities.MusicPlayerActivity
 import org.fossify.filemanager.helpers.OPEN_AS_AUDIO
 import org.fossify.filemanager.helpers.OPEN_AS_DEFAULT
 import org.fossify.filemanager.helpers.OPEN_AS_IMAGE
 import org.fossify.filemanager.helpers.OPEN_AS_TEXT
 import org.fossify.filemanager.helpers.OPEN_AS_VIDEO
 import java.io.File
+import java.util.Locale
 
 fun Activity.sharePaths(paths: ArrayList<String>) {
     sharePathsIntent(paths, BuildConfig.APPLICATION_ID)
@@ -60,6 +63,33 @@ private fun getMimeType(type: Int) = when (type) {
 
 fun Activity.setAs(path: String) {
     setAsIntent(path, BuildConfig.APPLICATION_ID)
+}
+
+fun Activity.openAudioInBuiltInPlayer(path: String) {
+    val folder = File(path).parentFile
+    val playlist = ArrayList<String>()
+    var startIndex = 0
+
+    val siblings = folder?.listFiles { file -> file.isFile && file.absolutePath.isAudioFast() }
+        ?.sortedBy { it.name.lowercase(Locale.getDefault()) }
+        ?: emptyList()
+
+    if (siblings.isEmpty()) {
+        playlist.add(path)
+    } else {
+        siblings.forEachIndexed { index, file ->
+            playlist.add(file.absolutePath)
+            if (file.absolutePath == path) {
+                startIndex = index
+            }
+        }
+    }
+
+    Intent(this, MusicPlayerActivity::class.java).apply {
+        putStringArrayListExtra(MusicPlayerActivity.EXTRA_PLAYLIST, playlist)
+        putExtra(MusicPlayerActivity.EXTRA_START_INDEX, startIndex)
+        startActivity(this)
+    }
 }
 
 fun BaseSimpleActivity.toggleItemVisibility(oldPath: String, hide: Boolean, callback: ((newPath: String) -> Unit)? = null) {
