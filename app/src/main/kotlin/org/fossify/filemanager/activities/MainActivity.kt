@@ -1,14 +1,19 @@
 package org.fossify.filemanager.activities
 
 import android.app.Activity
+import android.content.BroadcastReceiver
 import android.content.ClipData
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.drawable.Drawable
+import android.hardware.usb.UsbManager
 import android.media.RingtoneManager
 import android.os.Bundle
 import android.os.Handler
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.viewpager.widget.ViewPager
 import com.stericson.RootTools.RootTools
 import me.grantland.widget.AutofitHelper
@@ -92,6 +97,19 @@ class MainActivity : SimpleActivity() {
     private var mStoredTimeFormat = ""
     private var mStoredShowTabs = 0
 
+    private val usbConnectionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
+                    toast(R.string.usb_device_connected)
+                    checkOTGPath()
+                }
+
+                UsbManager.ACTION_USB_DEVICE_DETACHED -> toast(R.string.usb_device_disconnected)
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
@@ -111,6 +129,7 @@ class MainActivity : SimpleActivity() {
         setupTabs()
 
         setupEdgeToEdge(padBottomImeAndSystem = listOf(binding.mainTabsHolder))
+        registerUsbConnectionReceiver()
 
         if (savedInstanceState == null) {
             config.temporarilyShowHidden = false
@@ -159,6 +178,22 @@ class MainActivity : SimpleActivity() {
         super.onPause()
         storeStateVariables()
         config.lastUsedViewPagerPage = binding.mainViewPager.currentItem
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            unregisterReceiver(usbConnectionReceiver)
+        } catch (ignored: IllegalArgumentException) {
+        }
+    }
+
+    private fun registerUsbConnectionReceiver() {
+        val filter = IntentFilter().apply {
+            addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+            addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
+        }
+        ContextCompat.registerReceiver(this, usbConnectionReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
 
     override fun onBackPressedCompat(): Boolean {

@@ -56,6 +56,23 @@
     <!-- Settings -->
     <string name="enable_root_access">Enable root access</string>
     <string name="press_back_twice">Require pressing Back twice to leave the app</string>
+
+    <!-- Default apps -->
+    <string name="default_apps">Default apps</string>
+    <string name="music_player_engine">Music player engine</string>
+    <string name="system_player">System player</string>
+    <string name="built_in_player">Built-in player</string>
+
+    <!-- Music player -->
+    <string name="music_player">Music player</string>
+    <string name="playback_error">Cannot play this file</string>
+    <string name="play_pause">Play/Pause</string>
+    <string name="previous_track">Previous track</string>
+    <string name="next_track">Next track</string>
+
+    <!-- USB -->
+    <string name="usb_device_connected">USB storage device connected</string>
+    <string name="usb_device_disconnected">USB storage device disconnected</string>
     <!--
         Haven't found some strings? There's more at
         https://github.com/FossifyOrg/Commons/tree/master/commons/src/main/res
