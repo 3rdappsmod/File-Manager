@@ -23,10 +23,16 @@ const val DISPLAY_FILE_NAMES = "display_file_names"
 const val SHOW_TABS = "show_tabs"
 const val WAS_STORAGE_ANALYSIS_TAB_ADDED = "was_storage_analysis_tab_added"
 const val MUSIC_PLAYER_ENGINE = "music_player_engine"
+const val MUSIC_PLAYER_REPEAT_MODE = "music_player_repeat_mode"
 
 // music player engine
 const val MUSIC_PLAYER_ENGINE_SYSTEM = 0
 const val MUSIC_PLAYER_ENGINE_BUILT_IN = 1
+
+// music player repeat mode
+const val MUSIC_PLAYER_REPEAT_MODE_ONCE = 0
+const val MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE = 1
+const val MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL = 2
 
 // open as
 const val OPEN_AS_DEFAULT = 0

@@ -14,12 +14,17 @@ import android.media.session.PlaybackState
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.support.v4.media.session.MediaSessionCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import org.fossify.commons.extensions.getFilenameFromPath
 import org.fossify.filemanager.R
 import org.fossify.filemanager.activities.MusicPlayerActivity
+import org.fossify.filemanager.extensions.config
+import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_ONCE
+import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE
+import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL
 import java.io.IOException
 
 class MusicPlayerService : Service() {
@@ -49,11 +54,13 @@ class MusicPlayerService : Service() {
     private var currentIndex = 0
     private var isPrepared = false
     var listener: PlaybackListener? = null
+    var repeatMode = MUSIC_PLAYER_REPEAT_MODE_ONCE
 
     override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onCreate() {
         super.onCreate()
+        repeatMode = config.musicPlayerRepeatMode
         createNotificationChannel()
         setupMediaSession()
     }
@@ -92,8 +99,10 @@ class MusicPlayerService : Service() {
 
         if (player.isPlaying) {
             player.pause()
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         } else {
             player.start()
+            startForegroundWithNotification()
         }
 
         onPlaybackStateUpdated()
@@ -149,10 +158,11 @@ class MusicPlayerService : Service() {
                 setOnPreparedListener {
                     isPrepared = true
                     it.start()
+                    startForegroundWithNotification()
                     onTrackChangedUpdated(path, true)
                 }
                 setOnCompletionListener {
-                    playNext()
+                    onTrackCompleted()
                 }
                 setOnErrorListener { _, _, _ ->
                     isPrepared = false
@@ -168,8 +178,22 @@ class MusicPlayerService : Service() {
             listener?.onError()
             return
         }
+    }
 
-        startForegroundWithNotification()
+    private fun onTrackCompleted() {
+        when (repeatMode) {
+            MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE -> replayCurrent()
+            MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL -> playNext()
+            else -> stopPlayback()
+        }
+    }
+
+    private fun replayCurrent() {
+        mediaPlayer?.apply {
+            seekTo(0)
+            start()
+        }
+        onPlaybackStateUpdated()
     }
 
     private fun stopPlayback() {
@@ -264,6 +288,10 @@ class MusicPlayerService : Service() {
     }
 
     private fun updateNotification() {
+        if (!isPlaying()) {
+            return
+        }
+
         val manager = getSystemService(NotificationManager::class.java)
         manager.notify(NOTIFICATION_ID, buildNotification())
     }
@@ -286,11 +314,14 @@ class MusicPlayerService : Service() {
             .addAction(android.R.drawable.ic_media_previous, getString(R.string.previous_track), getActionPendingIntent(ACTION_PREVIOUS))
             .addAction(playPauseIcon, getString(R.string.play_pause), getActionPendingIntent(ACTION_PLAY_PAUSE))
             .addAction(android.R.drawable.ic_media_next, getString(R.string.next_track), getActionPendingIntent(ACTION_NEXT))
-            .setStyle(
-                MediaStyle()
-                    .setShowActionsInCompactView(0, 1, 2)
-            )
+            .setStyle(buildMediaStyle())
             .build()
+    }
+
+    private fun buildMediaStyle(): MediaStyle {
+        val style = MediaStyle().setShowActionsInCompactView(0, 1, 2)
+        mediaSession?.sessionToken?.let { style.setMediaSession(MediaSessionCompat.Token.fromToken(it)) }
+        return style
     }
 
     private fun getActionPendingIntent(action: String): PendingIntent {

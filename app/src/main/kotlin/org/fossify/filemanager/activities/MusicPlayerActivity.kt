@@ -16,6 +16,10 @@ import org.fossify.commons.extensions.viewBinding
 import org.fossify.commons.helpers.NavigationIcon
 import org.fossify.filemanager.R
 import org.fossify.filemanager.databinding.ActivityMusicPlayerBinding
+import org.fossify.filemanager.extensions.config
+import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_ONCE
+import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE
+import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL
 import org.fossify.filemanager.services.MusicPlayerService
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -47,6 +51,7 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
             isBound = true
             startRequestedPlaylist()
             updateTrackInfo()
+            updateRepeatModeIcon(musicService?.repeatMode ?: MUSIC_PLAYER_REPEAT_MODE_ONCE)
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -100,6 +105,10 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
             musicPlayerPrevious.setOnClickListener {
                 musicService?.playPrevious()
                 updateTrackInfo()
+            }
+
+            musicPlayerRepeatMode.setOnClickListener {
+                cycleRepeatMode()
             }
 
             musicPlayerSeekbar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -159,6 +168,39 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
     private fun updatePlayPauseIcon(isPlaying: Boolean) {
         val iconId = if (isPlaying) R.drawable.ic_pause_vector else R.drawable.ic_play_vector
         binding.musicPlayerPlayPause.setImageResource(iconId)
+    }
+
+    private fun cycleRepeatMode() {
+        val currentMode = musicService?.repeatMode ?: MUSIC_PLAYER_REPEAT_MODE_ONCE
+        val nextMode = when (currentMode) {
+            MUSIC_PLAYER_REPEAT_MODE_ONCE -> MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE
+            MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE -> MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL
+            else -> MUSIC_PLAYER_REPEAT_MODE_ONCE
+        }
+
+        musicService?.repeatMode = nextMode
+        config.musicPlayerRepeatMode = nextMode
+        updateRepeatModeIcon(nextMode)
+        toast(repeatModeDescription(nextMode))
+    }
+
+    private fun updateRepeatModeIcon(mode: Int) {
+        val iconId = when (mode) {
+            MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE -> R.drawable.ic_repeat_mode_repeat_one_vector
+            MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL -> R.drawable.ic_repeat_mode_sequential_vector
+            else -> R.drawable.ic_repeat_mode_once_vector
+        }
+
+        binding.musicPlayerRepeatMode.apply {
+            setImageResource(iconId)
+            contentDescription = getString(repeatModeDescription(mode))
+        }
+    }
+
+    private fun repeatModeDescription(mode: Int) = when (mode) {
+        MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE -> R.string.repeat_mode_repeat_one
+        MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL -> R.string.repeat_mode_sequential
+        else -> R.string.repeat_mode_once
     }
 
     override fun onTrackChanged(path: String, isPlaying: Boolean) {
