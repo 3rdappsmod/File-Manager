@@ -15,6 +15,7 @@ import org.fossify.filemanager.databinding.RecentsFragmentBinding
 import org.fossify.filemanager.databinding.StorageFragmentBinding
 import org.fossify.filemanager.extensions.config
 import org.fossify.filemanager.extensions.isPathOnRoot
+import org.fossify.filemanager.extensions.isPlayableAudioFast
 import org.fossify.filemanager.extensions.openAudioInBuiltInPlayer
 import org.fossify.filemanager.extensions.tryOpenPathIntent
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_ENGINE_BUILT_IN
@@ -42,7 +43,7 @@ abstract class MyViewPagerFragment<BINDING : MyViewPagerFragment.InnerBinding>(c
             } else {
                 activity?.toast(R.string.select_audio_file)
             }
-        } else if (path.isAudioFast() && activity?.config?.musicPlayerEngine == MUSIC_PLAYER_ENGINE_BUILT_IN) {
+        } else if (path.isPlayableAudioFast() && activity?.config?.musicPlayerEngine == MUSIC_PLAYER_ENGINE_BUILT_IN) {
             activity?.openAudioInBuiltInPlayer(path)
         } else {
             activity?.tryOpenPathIntent(path, false)
