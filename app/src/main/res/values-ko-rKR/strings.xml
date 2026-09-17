@@ -68,6 +68,9 @@
     <string name="playback_error">이 파일을 재생할 수 없습니다</string>
     <string name="play_pause">재생/일시정지</string>
     <string name="previous_track">이전 트랙</string>
+    <string name="repeat_mode_once">한번재생</string>
+    <string name="repeat_mode_repeat_one">반복재생</string>
+    <string name="repeat_mode_sequential">연달아재생</string>
     <string name="next_track">다음 트랙</string>
 
     <!-- USB -->

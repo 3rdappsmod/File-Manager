@@ -113,7 +113,7 @@ class MusicPlayerService : Service() {
             currentIndex++
             playCurrent()
         } else {
-            stopPlayback()
+            pauseAtStart()
         }
     }
 
@@ -184,7 +184,7 @@ class MusicPlayerService : Service() {
         when (repeatMode) {
             MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE -> replayCurrent()
             MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL -> playNext()
-            else -> stopPlayback()
+            else -> pauseAtStart()
         }
     }
 
@@ -193,6 +193,20 @@ class MusicPlayerService : Service() {
             seekTo(0)
             start()
         }
+        onPlaybackStateUpdated()
+    }
+
+    // used when there is nothing left to auto-advance to (once mode, or end of playlist):
+    // rewind to the beginning and pause, instead of tearing the player down, so the same
+    // track can be replayed from this screen without needing to reopen it
+    private fun pauseAtStart() {
+        mediaPlayer?.apply {
+            if (isPlaying) {
+                pause()
+            }
+            seekTo(0)
+        }
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         onPlaybackStateUpdated()
     }
 
