@@ -7,7 +7,6 @@ import org.fossify.commons.activities.BaseSimpleActivity
 import org.fossify.commons.extensions.getFilenameFromPath
 import org.fossify.commons.extensions.getParentPath
 import org.fossify.commons.extensions.getMimeTypeFromUri
-import org.fossify.commons.extensions.isAudioFast
 import org.fossify.commons.extensions.launchActivityIntent
 import org.fossify.commons.extensions.openPathIntent
 import org.fossify.commons.extensions.renameFile
@@ -70,7 +69,7 @@ fun Activity.openAudioInBuiltInPlayer(path: String) {
     val playlist = ArrayList<String>()
     var startIndex = 0
 
-    val siblings = folder?.listFiles { file -> file.isFile && file.absolutePath.isAudioFast() }
+    val siblings = folder?.listFiles { file -> file.isFile && file.absolutePath.isPlayableAudioFast() }
         ?.sortedBy { it.name.lowercase(Locale.getDefault()) }
         ?: emptyList()
 

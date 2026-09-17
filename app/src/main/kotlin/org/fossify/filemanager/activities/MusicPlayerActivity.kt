@@ -9,10 +9,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.widget.SeekBar
-import org.fossify.commons.extensions.getColoredDrawableWithColor
-import org.fossify.commons.extensions.getContrastColor
 import org.fossify.commons.extensions.getFilenameFromPath
-import org.fossify.commons.extensions.getProperPrimaryColor
 import org.fossify.commons.extensions.toast
 import org.fossify.commons.extensions.updateTextColors
 import org.fossify.commons.extensions.viewBinding
@@ -161,8 +158,7 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
 
     private fun updatePlayPauseIcon(isPlaying: Boolean) {
         val iconId = if (isPlaying) R.drawable.ic_pause_vector else R.drawable.ic_play_vector
-        val color = getProperPrimaryColor().getContrastColor()
-        binding.musicPlayerPlayPause.setImageDrawable(resources.getColoredDrawableWithColor(iconId, color))
+        binding.musicPlayerPlayPause.setImageResource(iconId)
     }
 
     override fun onTrackChanged(path: String, isPlaying: Boolean) {
