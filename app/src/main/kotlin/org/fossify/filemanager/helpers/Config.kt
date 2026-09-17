@@ -125,4 +125,8 @@ class Config(context: Context) : BaseConfig(context) {
     var musicPlayerEngine: Int
         get() = prefs.getInt(MUSIC_PLAYER_ENGINE, MUSIC_PLAYER_ENGINE_SYSTEM)
         set(musicPlayerEngine) = prefs.edit().putInt(MUSIC_PLAYER_ENGINE, musicPlayerEngine).apply()
+
+    var musicPlayerRepeatMode: Int
+        get() = prefs.getInt(MUSIC_PLAYER_REPEAT_MODE, MUSIC_PLAYER_REPEAT_MODE_ONCE)
+        set(musicPlayerRepeatMode) = prefs.edit().putInt(MUSIC_PLAYER_REPEAT_MODE, musicPlayerRepeatMode).apply()
 }

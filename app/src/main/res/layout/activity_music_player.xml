@@ -128,6 +128,17 @@
 
         </LinearLayout>
 
+        <ImageView
+            android:id="@+id/music_player_repeat_mode"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="@dimen/normal_margin"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/repeat_mode_once"
+            android:padding="@dimen/small_margin"
+            android:src="@drawable/ic_repeat_mode_once_vector" />
+
         <Space
             android:layout_width="match_parent"
             android:layout_height="0dp"
