@@ -1,29 +1,17 @@
 package org.fossify.filemanager.services
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
-import android.content.pm.ServiceInfo
 import android.media.MediaPlayer
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Binder
-import android.os.Build
 import android.os.Handler
 import android.os.PowerManager
 import android.os.Looper
 import android.os.IBinder
 import android.util.Log
-import android.support.v4.media.session.MediaSessionCompat
-import androidx.core.app.NotificationCompat
-import androidx.core.app.ServiceCompat
-import androidx.media.app.NotificationCompat.MediaStyle
 import org.fossify.commons.extensions.getFilenameFromPath
-import org.fossify.filemanager.R
-import org.fossify.filemanager.activities.MusicPlayerActivity
 import org.fossify.filemanager.extensions.config
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_ONCE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE
@@ -32,19 +20,20 @@ import org.fossify.filemanager.helpers.PlaybackState as PlayerState
 import org.fossify.filemanager.helpers.isVisibleAudio
 import org.fossify.filemanager.helpers.StorageEvents
 import org.fossify.filemanager.helpers.isWithinStorage
+import org.fossify.filemanager.helpers.PlayerNotification
 import org.fossify.filemanager.helpers.AudioFocus
 import org.fossify.filemanager.helpers.PlaybackRequest
 import org.fossify.filemanager.helpers.AudioStorage
 import java.io.IOException
 
+// Binder commands and Android lifecycle callbacks share the main-thread playback owner.
+@Suppress("TooManyFunctions")
 class MusicPlayerService : Service() {
     companion object {
         const val ACTION_PLAY_PAUSE = "org.fossify.filemanager.action.PLAY_PAUSE"
         const val ACTION_NEXT = "org.fossify.filemanager.action.NEXT"
         const val ACTION_PREVIOUS = "org.fossify.filemanager.action.PREVIOUS"
         const val ACTION_STOP = "org.fossify.filemanager.action.STOP"
-        private const val NOTIFICATION_CHANNEL_ID = "music_player_channel"
-        private const val NOTIFICATION_ID = 1000
     }
 
     interface PlaybackListener {
@@ -58,6 +47,7 @@ class MusicPlayerService : Service() {
     }
 
     private val binder = MusicPlayerBinder()
+    private val notification by lazy { PlayerNotification(this) }
     private val audioFocus by lazy { AudioFocus(this, ::pause) }
     private val storageEvents by lazy {
         StorageEvents(this, {}, { root ->
@@ -92,7 +82,6 @@ class MusicPlayerService : Service() {
     override fun onCreate() {
         super.onCreate()
         repeatMode = config.musicPlayerRepeatMode
-        createNotificationChannel()
         setupMediaSession()
         storageEvents.start()
     }
@@ -158,7 +147,7 @@ class MusicPlayerService : Service() {
         }
         try {
             // Target 35+ requires a visible activity or foreground service before requesting focus.
-            startForegroundWithNotification()
+            notification.start(getCurrentPath(), isPlaying(), mediaSession?.sessionToken)
             if (!audioFocus.acquire()) {
                 pause()
                 return
@@ -177,7 +166,7 @@ class MusicPlayerService : Service() {
         if (isPlaying()) mediaPlayer?.pause()
         playerState.pause()
         audioFocus.release()
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        notification.remove()
         onPlaybackStateUpdated()
     }
 
@@ -209,8 +198,6 @@ class MusicPlayerService : Service() {
     fun getCurrentPath() = playlist.getOrNull(currentIndex) ?: ""
 
     fun isPlaying() = playerState.status == PlayerState.Status.PLAYING
-
-    fun isPlaylistEmpty() = playlist.isEmpty()
 
     fun getDuration() = if (isPrepared) mediaPlayer?.duration ?: 0 else 0
 
@@ -267,7 +254,7 @@ class MusicPlayerService : Service() {
         releaseMediaPlayer()
         playerState.stop(failed = true)
         audioFocus.release()
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        notification.remove()
         onPlaybackStateUpdated()
         listeners.toList().forEach { it.onError() }
     }
@@ -292,7 +279,7 @@ class MusicPlayerService : Service() {
         playerState.pause()
         seekTo(0)
         audioFocus.release()
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        notification.remove()
         onPlaybackStateUpdated()
     }
 
@@ -300,7 +287,7 @@ class MusicPlayerService : Service() {
         requests.invalidate()
         audioFocus.release()
         releaseMediaPlayer()
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        notification.remove()
         onPlaybackStateUpdated()
         stopSelf()
     }
@@ -315,14 +302,20 @@ class MusicPlayerService : Service() {
         listeners.toList().forEach { it.onTrackChanged(path, isPlaying) }
         updateMediaSessionMetadata(path)
         updateMediaSessionPlaybackState(isPlaying)
-        updateNotification()
+        notification.update(
+            getCurrentPath(), isPlaying(), mediaSession?.sessionToken,
+            playerState.status == PlayerState.Status.PREPARING && playerState.playWhenReady
+        )
     }
 
     private fun onPlaybackStateUpdated() {
         val playing = isPlaying()
         listeners.toList().forEach { it.onPlaybackStateChanged(playing) }
         updateMediaSessionPlaybackState(playing)
-        updateNotification()
+        notification.update(
+            getCurrentPath(), isPlaying(), mediaSession?.sessionToken,
+            playerState.status == PlayerState.Status.PREPARING && playerState.playWhenReady
+        )
     }
 
     private fun setupMediaSession() {
@@ -351,7 +344,11 @@ class MusicPlayerService : Service() {
     private fun updateMediaSessionPlaybackState(isPlaying: Boolean) {
         val state = when (playerState.status) {
             PlayerState.Status.STOPPED -> PlaybackState.STATE_STOPPED
-            PlayerState.Status.PREPARING -> PlaybackState.STATE_BUFFERING
+            PlayerState.Status.PREPARING -> if (playerState.playWhenReady) {
+                PlaybackState.STATE_BUFFERING
+            } else {
+                PlaybackState.STATE_PAUSED
+            }
             PlayerState.Status.PAUSED -> PlaybackState.STATE_PAUSED
             PlayerState.Status.PLAYING -> PlaybackState.STATE_PLAYING
             PlayerState.Status.ERROR -> PlaybackState.STATE_ERROR
@@ -368,72 +365,4 @@ class MusicPlayerService : Service() {
         )
     }
 
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val manager = getSystemService(NotificationManager::class.java)
-            val channel = NotificationChannel(
-                NOTIFICATION_CHANNEL_ID,
-                getString(R.string.music_player),
-                NotificationManager.IMPORTANCE_LOW
-            )
-            manager.createNotificationChannel(channel)
-        }
-    }
-
-    private fun startForegroundWithNotification() {
-        val notification = buildNotification()
-        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-        } else {
-            0
-        }
-        ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)
-    }
-
-    private fun updateNotification() {
-        if (!isPlaying()) {
-            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-            return
-        }
-
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(NOTIFICATION_ID, buildNotification())
-    }
-
-    private fun buildNotification(): Notification {
-        val contentIntent = PendingIntent.getActivity(
-            this, 0, Intent(this, MusicPlayerActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val playPauseIcon = if (isPlaying()) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
-
-        return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle(getCurrentPath().getFilenameFromPath())
-            .setContentText(getString(R.string.music_player))
-            .setContentIntent(contentIntent)
-            .setOngoing(isPlaying())
-            .setOnlyAlertOnce(true)
-            .addAction(android.R.drawable.ic_media_previous, getString(R.string.previous_track), getActionPendingIntent(ACTION_PREVIOUS))
-            .addAction(playPauseIcon, getString(R.string.play_pause), getActionPendingIntent(ACTION_PLAY_PAUSE))
-            .addAction(android.R.drawable.ic_media_next, getString(R.string.next_track), getActionPendingIntent(ACTION_NEXT))
-            .setStyle(buildMediaStyle())
-            .build()
-    }
-
-    private fun buildMediaStyle(): MediaStyle {
-        val style = MediaStyle().setShowActionsInCompactView(0, 1, 2)
-        mediaSession?.sessionToken?.let { style.setMediaSession(MediaSessionCompat.Token.fromToken(it)) }
-        return style
-    }
-
-    private fun getActionPendingIntent(action: String): PendingIntent {
-        val intent = Intent(this, MusicPlayerService::class.java).apply {
-            this.action = action
-        }
-        return PendingIntent.getService(this, action.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-    }
 }
