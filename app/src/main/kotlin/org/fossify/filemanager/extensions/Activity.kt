@@ -14,13 +14,13 @@ import org.fossify.commons.extensions.setAsIntent
 import org.fossify.commons.extensions.sharePathsIntent
 import org.fossify.filemanager.BuildConfig
 import org.fossify.filemanager.activities.MusicPlayerActivity
+import org.fossify.filemanager.helpers.buildAudioPlaylist
 import org.fossify.filemanager.helpers.OPEN_AS_AUDIO
 import org.fossify.filemanager.helpers.OPEN_AS_DEFAULT
 import org.fossify.filemanager.helpers.OPEN_AS_IMAGE
 import org.fossify.filemanager.helpers.OPEN_AS_TEXT
 import org.fossify.filemanager.helpers.OPEN_AS_VIDEO
 import java.io.File
-import java.util.Locale
 
 fun Activity.sharePaths(paths: ArrayList<String>) {
     sharePathsIntent(paths, BuildConfig.APPLICATION_ID)
@@ -65,24 +65,10 @@ fun Activity.setAs(path: String) {
 }
 
 fun Activity.openAudioInBuiltInPlayer(path: String) {
-    val folder = File(path).parentFile
-    val playlist = ArrayList<String>()
-    var startIndex = 0
-
-    val siblings = folder?.listFiles { file -> file.isFile && file.absolutePath.isPlayableAudioFast() }
-        ?.sortedBy { it.name.lowercase(Locale.getDefault()) }
-        ?: emptyList()
-
-    if (siblings.isEmpty()) {
-        playlist.add(path)
-    } else {
-        siblings.forEachIndexed { index, file ->
-            playlist.add(file.absolutePath)
-            if (file.absolutePath == path) {
-                startIndex = index
-            }
-        }
-    }
+    val candidates = File(path).parentFile?.listFiles()?.filter { it.isFile }?.map { it.absolutePath }.orEmpty()
+    val playlist = ArrayList(buildAudioPlaylist(path, candidates, config.shouldShowHidden()))
+    if (playlist.isEmpty()) return
+    val startIndex = playlist.indexOf(path)
 
     Intent(this, MusicPlayerActivity::class.java).apply {
         putStringArrayListExtra(MusicPlayerActivity.EXTRA_PLAYLIST, playlist)
