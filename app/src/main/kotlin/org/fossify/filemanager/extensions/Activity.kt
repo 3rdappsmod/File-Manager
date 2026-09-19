@@ -14,14 +14,12 @@ import org.fossify.commons.extensions.setAsIntent
 import org.fossify.commons.extensions.sharePathsIntent
 import org.fossify.filemanager.BuildConfig
 import org.fossify.filemanager.activities.MusicPlayerActivity
-import org.fossify.filemanager.helpers.AudioStorage
-import org.fossify.filemanager.R
-import org.fossify.commons.extensions.toast
 import org.fossify.filemanager.helpers.OPEN_AS_AUDIO
 import org.fossify.filemanager.helpers.OPEN_AS_DEFAULT
 import org.fossify.filemanager.helpers.OPEN_AS_IMAGE
 import org.fossify.filemanager.helpers.OPEN_AS_TEXT
 import org.fossify.filemanager.helpers.OPEN_AS_VIDEO
+import java.util.UUID
 import java.io.File
 
 fun Activity.sharePaths(paths: ArrayList<String>) {
@@ -67,20 +65,11 @@ fun Activity.setAs(path: String) {
 }
 
 fun Activity.openAudioInBuiltInPlayer(path: String) {
-    AudioStorage(applicationContext).loadPlaylist(path) { result ->
-        runOnUiThread {
-            if (!isFinishing && !isDestroyed) {
-                result.onSuccess { paths ->
-                    if (paths.isNotEmpty()) {
-                        Intent(this, MusicPlayerActivity::class.java).apply {
-                            putStringArrayListExtra(MusicPlayerActivity.EXTRA_PLAYLIST, ArrayList(paths))
-                            putExtra(MusicPlayerActivity.EXTRA_START_INDEX, paths.indexOf(path))
-                            startActivity(this)
-                        }
-                    }
-                }.onFailure { toast(R.string.playback_error) }
-            }
-        }
+    Intent(this, MusicPlayerActivity::class.java).apply {
+        putExtra(MusicPlayerActivity.EXTRA_PATH, path)
+        putExtra(MusicPlayerActivity.EXTRA_REQUEST_ID, UUID.randomUUID().toString())
+        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        startActivity(this)
     }
 }
 
