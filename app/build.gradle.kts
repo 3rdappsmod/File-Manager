@@ -148,3 +148,8 @@ dependencies {
     implementation(libs.zip4j)
     detektPlugins(libs.compose.detekt)
 }
+
+// Analyze the application's bytecode target, independently of the JVM running Gradle.
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    jvmTarget = libs.versions.app.build.kotlinJVMTarget.get()
+}
