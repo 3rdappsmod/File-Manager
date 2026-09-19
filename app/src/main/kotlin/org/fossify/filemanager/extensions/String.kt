@@ -6,14 +6,13 @@ import java.util.Locale
 
 fun String.isZipFile() = endsWith(".zip", true)
 
-// broader than isAudioFast(): also covers formats (e.g. AMR/AMR-WB call recordings) that
-// the default mimetype lookup doesn't recognize, so the built-in music player picks them up too
+// Adds candidates missing from Commons audioExtensions. Actual decoding depends on the file and device.
 fun String.isPlayableAudioFast(): Boolean {
     if (isAudioFast()) {
         return true
     }
 
-    val extension = substringAfterLast('.', "").lowercase(Locale.getDefault())
+    val extension = substringAfterLast('.', "").lowercase(Locale.ROOT)
     return extension.isNotEmpty() && extraPlayableAudioExtensions.contains(extension)
 }
 
