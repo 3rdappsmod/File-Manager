@@ -7,13 +7,13 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Binder
 import android.os.Build
 import android.os.Handler
+import android.os.PowerManager
 import android.os.Looper
 import android.os.IBinder
 import android.util.Log
@@ -30,6 +30,7 @@ import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL
 import org.fossify.filemanager.helpers.PlaybackState as PlayerState
 import org.fossify.filemanager.helpers.isVisibleAudio
+import org.fossify.filemanager.helpers.AudioFocus
 import org.fossify.filemanager.helpers.PlaybackRequest
 import org.fossify.filemanager.helpers.AudioStorage
 import java.io.IOException
@@ -55,6 +56,7 @@ class MusicPlayerService : Service() {
     }
 
     private val binder = MusicPlayerBinder()
+    private val audioFocus by lazy { AudioFocus(this, ::pause) }
     private var mediaPlayer: MediaPlayer? = null
     private var mediaSession: MediaSession? = null
     private var playlist = ArrayList<String>()
@@ -97,6 +99,7 @@ class MusicPlayerService : Service() {
     override fun onDestroy() {
         requests.invalidate()
         listeners.clear()
+        audioFocus.release()
         releaseMediaPlayer()
         mediaSession?.release()
         super.onDestroy()
@@ -142,9 +145,14 @@ class MusicPlayerService : Service() {
             return
         }
         try {
+            // Target 35+ requires a visible activity or foreground service before requesting focus.
+            startForegroundWithNotification()
+            if (!audioFocus.acquire()) {
+                pause()
+                return
+            }
             mediaPlayer?.start()
             playerState.started()
-            startForegroundWithNotification()
             onPlaybackStateUpdated()
         } catch (error: IllegalStateException) {
             playbackFailed(error)
@@ -156,6 +164,7 @@ class MusicPlayerService : Service() {
     fun pause() {
         if (isPlaying()) mediaPlayer?.pause()
         playerState.pause()
+        audioFocus.release()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         onPlaybackStateUpdated()
     }
@@ -209,12 +218,8 @@ class MusicPlayerService : Service() {
             val player = MediaPlayer()
             mediaPlayer = player
             player.apply {
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build()
-                )
+                setAudioAttributes(AudioFocus.attributes())
+                setWakeMode(this@MusicPlayerService, PowerManager.PARTIAL_WAKE_LOCK)
                 AudioStorage(this@MusicPlayerService).setDataSource(this, path)
                 setOnPreparedListener {
                     if (mediaPlayer === it) {
@@ -249,6 +254,7 @@ class MusicPlayerService : Service() {
         Log.w("MusicPlayerService", "Audio playback failed", error)
         releaseMediaPlayer()
         playerState.stop(failed = true)
+        audioFocus.release()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         onPlaybackStateUpdated()
         listeners.toList().forEach { it.onError() }
@@ -273,12 +279,14 @@ class MusicPlayerService : Service() {
         if (isPrepared && mediaPlayer?.isPlaying == true) mediaPlayer?.pause()
         playerState.pause()
         seekTo(0)
+        audioFocus.release()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         onPlaybackStateUpdated()
     }
 
     private fun stopPlayback() {
         requests.invalidate()
+        audioFocus.release()
         releaseMediaPlayer()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         onPlaybackStateUpdated()
@@ -372,6 +380,7 @@ class MusicPlayerService : Service() {
 
     private fun updateNotification() {
         if (!isPlaying()) {
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             return
         }
 
