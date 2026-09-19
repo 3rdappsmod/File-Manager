@@ -4,6 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Handler
+import android.os.Looper
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import androidx.core.content.ContextCompat
@@ -21,8 +23,12 @@ class UsbStorageMonitor(
     private val onRemoved: (String) -> Unit,
     private val onChanged: () -> Unit
 ) {
+    private val handler = Handler(Looper.getMainLooper())
+    private var generation = 0
+    private var closed = true
     private val volumes = StorageEvents(context, { path ->
         if (hasUsbStorage() && path != context.internalStoragePath && path != context.sdCardPath) {
+            generation++
             context.config.OTGPath = path.trimEnd('/')
             context.config.wasOTGHandled = true
             onChanged()
@@ -44,6 +50,7 @@ class UsbStorageMonitor(
     }
 
     fun start() {
+        closed = false
         val filter = IntentFilter().apply {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
@@ -53,11 +60,14 @@ class UsbStorageMonitor(
     }
 
     fun close() {
+        closed = true
+        generation++
         context.unregisterReceiver(receiver)
         volumes.close()
     }
 
     fun refreshPath() {
+        val requestedGeneration = generation
         ensureBackgroundThread {
             val path = if (hasUsbStorage()) {
                 context.getStorageDirectories().map { it.trimEnd('/') }
@@ -65,8 +75,14 @@ class UsbStorageMonitor(
             } else {
                 ""
             }
-            context.config.OTGPath = path
-            context.config.wasOTGHandled = path.isNotEmpty()
+            handler.post {
+                if (!closed && requestedGeneration == generation) {
+                    val changed = context.config.OTGPath != path
+                    context.config.OTGPath = path
+                    context.config.wasOTGHandled = path.isNotEmpty()
+                    if (changed) onChanged()
+                }
+            }
         }
     }
 
@@ -76,6 +92,7 @@ class UsbStorageMonitor(
         }
 
     private fun removePath(path: String) {
+        generation++
         if (path.isEmpty()) return
         if (context.config.OTGPath.isWithinStorage(path)) {
             context.config.OTGPath = ""
