@@ -38,6 +38,8 @@ class AudioStorage(private val context: Context) {
                 callback(Result.failure(error))
             } catch (error: IOException) {
                 callback(Result.failure(error))
+            } catch (error: IllegalArgumentException) {
+                callback(Result.failure(error))
             }
         }
     }

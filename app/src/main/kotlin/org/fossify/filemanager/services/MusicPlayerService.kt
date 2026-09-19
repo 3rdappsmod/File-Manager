@@ -102,6 +102,7 @@ class MusicPlayerService : Service() {
         listeners.clear()
         audioFocus.release()
         releaseMediaPlayer()
+        notification.remove()
         mediaSession?.release()
         super.onDestroy()
     }
@@ -152,6 +153,8 @@ class MusicPlayerService : Service() {
                 pause()
                 return
             }
+            // stopSelf() may previously have cleared the started lifetime while an activity stayed bound.
+            startService(Intent(this, MusicPlayerService::class.java))
             mediaPlayer?.start()
             playerState.started()
             onPlaybackStateUpdated()
