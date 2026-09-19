@@ -2,6 +2,7 @@ package org.fossify.filemanager.activities
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.res.ColorStateList
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Bundle
@@ -10,6 +11,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.widget.SeekBar
 import androidx.lifecycle.Lifecycle
+import org.fossify.commons.extensions.getProperTextColor
 import org.fossify.commons.extensions.getFilenameFromPath
 import org.fossify.commons.extensions.toast
 import org.fossify.commons.extensions.updateTextColors
@@ -65,6 +67,7 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
         setupViews()
+        setupEdgeToEdge(padBottomSystem = listOf(binding.musicPlayerHolder))
 
         val serviceIntent = Intent(this, MusicPlayerService::class.java)
         startService(serviceIntent)
@@ -93,6 +96,11 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
         super.onResume()
         setupTopAppBar(binding.musicPlayerAppbar, NavigationIcon.Arrow)
         updateTextColors(binding.musicPlayerHolder)
+        val tint = ColorStateList.valueOf(getProperTextColor())
+        binding.apply {
+            listOf(musicPlayerPlayPause, musicPlayerPrevious, musicPlayerNext, musicPlayerRepeatMode,
+                musicPlayerAlbumArt).forEach { it.imageTintList = tint }
+        }
         progressHandler.post(progressUpdater)
     }
 
