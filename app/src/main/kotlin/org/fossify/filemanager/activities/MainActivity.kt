@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.content.IntentCompat
 import androidx.core.content.ContextCompat
 import androidx.viewpager.widget.ViewPager
 import com.stericson.RootTools.RootTools
@@ -32,7 +33,6 @@ import org.fossify.commons.extensions.getRealPathFromURI
 import org.fossify.commons.extensions.getStorageDirectories
 import org.fossify.commons.extensions.getTimeFormat
 import org.fossify.commons.extensions.handleHiddenFolderPasswordProtection
-import org.fossify.commons.extensions.hasOTGConnected
 import org.fossify.commons.extensions.hasPermission
 import org.fossify.commons.extensions.hideKeyboard
 import org.fossify.commons.extensions.humanizePath
@@ -74,6 +74,9 @@ import org.fossify.filemanager.fragments.ItemsFragment
 import org.fossify.filemanager.fragments.MyViewPagerFragment
 import org.fossify.filemanager.fragments.RecentsFragment
 import org.fossify.filemanager.fragments.StorageFragment
+import org.fossify.filemanager.helpers.StorageEvents
+import org.fossify.filemanager.helpers.isMassStorage
+import org.fossify.filemanager.helpers.isWithinStorage
 import org.fossify.filemanager.helpers.MAX_COLUMN_COUNT
 import org.fossify.filemanager.helpers.RootHelpers
 import org.fossify.filemanager.interfaces.ItemOperationsListener
@@ -97,17 +100,47 @@ class MainActivity : SimpleActivity() {
     private var mStoredTimeFormat = ""
     private var mStoredShowTabs = 0
 
+    private val storageEvents by lazy {
+        StorageEvents(this, { path ->
+            if (hasUsbStorage() && path != internalStoragePath && path != sdCardPath) {
+                config.OTGPath = path.trimEnd('/')
+                config.wasOTGHandled = true
+                getAllFragments().forEach { it?.refreshFragment() }
+            }
+        }, ::onStorageRemoved)
+    }
+
     private val usbConnectionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            val device = IntentCompat.getParcelableExtra(
+                intent, UsbManager.EXTRA_DEVICE, android.hardware.usb.UsbDevice::class.java
+            ) ?: return
+            if (!device.isMassStorage()) return
             when (intent.action) {
-                UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
-                    toast(R.string.usb_device_connected)
-                    checkOTGPath()
+                UsbManager.ACTION_USB_DEVICE_ATTACHED -> toast(R.string.usb_device_connected)
+                UsbManager.ACTION_USB_DEVICE_DETACHED -> {
+                    toast(R.string.usb_device_disconnected)
+                    if (!hasUsbStorage(device.deviceId)) onStorageRemoved(config.OTGPath)
                 }
-
-                UsbManager.ACTION_USB_DEVICE_DETACHED -> toast(R.string.usb_device_disconnected)
             }
         }
+    }
+
+    private fun hasUsbStorage(excludedId: Int? = null): Boolean =
+        getSystemService(UsbManager::class.java).deviceList.values.any {
+            it.deviceId != excludedId && it.isMassStorage()
+        }
+
+    private fun onStorageRemoved(path: String) {
+        if (path.isEmpty()) return
+        if (config.OTGPath.isWithinStorage(path)) {
+            config.OTGPath = ""
+            config.wasOTGHandled = false
+        }
+        if (getCurrentFragment()?.currentPath?.isWithinStorage(path) == true) {
+            openPath(internalStoragePath, forceRefresh = true)
+        }
+        getAllFragments().forEach { it?.refreshFragment() }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -130,6 +163,7 @@ class MainActivity : SimpleActivity() {
 
         setupEdgeToEdge(padBottomImeAndSystem = listOf(binding.mainTabsHolder))
         registerUsbConnectionReceiver()
+        storageEvents.start()
 
         if (savedInstanceState == null) {
             config.temporarilyShowHidden = false
@@ -184,6 +218,7 @@ class MainActivity : SimpleActivity() {
         super.onDestroy()
         try {
             unregisterReceiver(usbConnectionReceiver)
+            storageEvents.close()
         } catch (ignored: IllegalArgumentException) {
         }
     }
@@ -482,11 +517,14 @@ class MainActivity : SimpleActivity() {
 
     private fun checkOTGPath() {
         ensureBackgroundThread {
-            if (!config.wasOTGHandled && hasPermission(PERMISSION_WRITE_STORAGE) && hasOTGConnected() && config.OTGPath.isEmpty()) {
-                getStorageDirectories().firstOrNull { it.trimEnd('/') != internalStoragePath && it.trimEnd('/') != sdCardPath }?.apply {
-                    config.wasOTGHandled = true
-                    config.OTGPath = trimEnd('/')
-                }
+            if (hasStoragePermission() && hasUsbStorage()) {
+                val path = getStorageDirectories().map { it.trimEnd('/') }
+                    .firstOrNull { it != internalStoragePath && it != sdCardPath }.orEmpty()
+                config.OTGPath = path
+                config.wasOTGHandled = path.isNotEmpty()
+            } else if (!hasUsbStorage()) {
+                config.OTGPath = ""
+                config.wasOTGHandled = false
             }
         }
     }

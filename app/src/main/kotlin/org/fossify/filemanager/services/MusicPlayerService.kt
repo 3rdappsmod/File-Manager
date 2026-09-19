@@ -30,6 +30,8 @@ import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL
 import org.fossify.filemanager.helpers.PlaybackState as PlayerState
 import org.fossify.filemanager.helpers.isVisibleAudio
+import org.fossify.filemanager.helpers.StorageEvents
+import org.fossify.filemanager.helpers.isWithinStorage
 import org.fossify.filemanager.helpers.AudioFocus
 import org.fossify.filemanager.helpers.PlaybackRequest
 import org.fossify.filemanager.helpers.AudioStorage
@@ -57,6 +59,14 @@ class MusicPlayerService : Service() {
 
     private val binder = MusicPlayerBinder()
     private val audioFocus by lazy { AudioFocus(this, ::pause) }
+    private val storageEvents by lazy {
+        StorageEvents(this, {}, { root ->
+            if (getCurrentPath().isWithinStorage(root)) {
+                requests.invalidate()
+                playbackFailed(IOException("Audio storage was removed"))
+            }
+        })
+    }
     private var mediaPlayer: MediaPlayer? = null
     private var mediaSession: MediaSession? = null
     private var playlist = ArrayList<String>()
@@ -84,6 +94,7 @@ class MusicPlayerService : Service() {
         repeatMode = config.musicPlayerRepeatMode
         createNotificationChannel()
         setupMediaSession()
+        storageEvents.start()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -98,6 +109,7 @@ class MusicPlayerService : Service() {
 
     override fun onDestroy() {
         requests.invalidate()
+        storageEvents.close()
         listeners.clear()
         audioFocus.release()
         releaseMediaPlayer()
