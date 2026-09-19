@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.widget.SeekBar
+import androidx.lifecycle.Lifecycle
 import org.fossify.commons.extensions.getFilenameFromPath
 import org.fossify.commons.extensions.toast
 import org.fossify.commons.extensions.updateTextColors
@@ -26,8 +27,8 @@ import java.util.concurrent.TimeUnit
 
 class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListener {
     companion object {
-        const val EXTRA_PLAYLIST = "extra_playlist"
-        const val EXTRA_START_INDEX = "extra_start_index"
+        const val EXTRA_PATH = "extra_path"
+        const val EXTRA_REQUEST_ID = "extra_request_id"
         private const val PROGRESS_UPDATE_DELAY = 500L
     }
 
@@ -47,8 +48,9 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             musicService = (service as MusicPlayerService.MusicPlayerBinder).getService()
-            musicService?.listener = this@MusicPlayerActivity
-            isBound = true
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                musicService?.addListener(this@MusicPlayerActivity)
+            }
             startRequestedPlaylist()
             updateTrackInfo()
             updateRepeatModeIcon(musicService?.repeatMode ?: MUSIC_PLAYER_REPEAT_MODE_ONCE)
@@ -56,7 +58,6 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
 
         override fun onServiceDisconnected(name: ComponentName?) {
             musicService = null
-            isBound = false
         }
     }
 
@@ -67,7 +68,25 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
 
         val serviceIntent = Intent(this, MusicPlayerService::class.java)
         startService(serviceIntent)
-        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+        isBound = bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        startRequestedPlaylist()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        musicService?.addListener(this)
+        updateTrackInfo()
+        updateRepeatModeIcon(musicService?.repeatMode ?: config.musicPlayerRepeatMode)
+    }
+
+    override fun onStop() {
+        musicService?.removeListener(this)
+        super.onStop()
     }
 
     override fun onResume() {
@@ -85,7 +104,7 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
     override fun onDestroy() {
         super.onDestroy()
         if (isBound) {
-            musicService?.listener = null
+            musicService?.removeListener(this)
             unbindService(serviceConnection)
             isBound = false
         }
@@ -131,13 +150,9 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
     }
 
     private fun startRequestedPlaylist() {
-        val playlist = intent.getStringArrayListExtra(EXTRA_PLAYLIST)
-        if (playlist.isNullOrEmpty()) {
-            return
-        }
-
-        val startIndex = intent.getIntExtra(EXTRA_START_INDEX, 0)
-        musicService?.startPlaylist(playlist, startIndex)
+        val path = intent.getStringExtra(EXTRA_PATH) ?: return
+        val requestId = intent.getStringExtra(EXTRA_REQUEST_ID) ?: return
+        musicService?.openPath(path, requestId)
     }
 
     private fun updateProgress() {
