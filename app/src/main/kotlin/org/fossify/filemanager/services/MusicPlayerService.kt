@@ -166,7 +166,7 @@ class MusicPlayerService : Service() {
     }
 
     fun pause() {
-        if (isPlaying()) mediaPlayer?.pause()
+        if (isPlaying()) withPreparedPlayer(Unit) { it.pause() }
         playerState.pause()
         audioFocus.release()
         notification.remove()
@@ -192,19 +192,31 @@ class MusicPlayerService : Service() {
     }
 
     fun seekTo(positionMs: Int) {
-        if (isPrepared) {
-            mediaPlayer?.seekTo(positionMs.coerceIn(0, getDuration()))
-            updateMediaSessionPlaybackState(isPlaying())
+        withPreparedPlayer(Unit) { player ->
+            player.seekTo(positionMs.coerceIn(0, player.duration.coerceAtLeast(0)))
         }
+        updateMediaSessionPlaybackState()
     }
 
     fun getCurrentPath() = playlist.getOrNull(currentIndex) ?: ""
 
     fun isPlaying() = playerState.status == PlayerState.Status.PLAYING
 
-    fun getDuration() = if (isPrepared) mediaPlayer?.duration ?: 0 else 0
+    fun getDuration() = withPreparedPlayer(0) { it.duration.coerceAtLeast(0) }
 
-    fun getCurrentPosition() = if (isPrepared) mediaPlayer?.currentPosition ?: 0 else 0
+    fun getCurrentPosition() = withPreparedPlayer(0) { it.currentPosition.coerceAtLeast(0) }
+
+    private inline fun <T> withPreparedPlayer(default: T, action: (MediaPlayer) -> T): T {
+        val player = mediaPlayer ?: return default
+        if (!isPrepared) return default
+        return try {
+            action(player)
+        } catch (error: IllegalStateException) {
+            // A native decoder can fail before its queued error callback reaches the main thread.
+            playbackFailed(error)
+            default
+        }
+    }
 
     private fun playCurrent(autoPlay: Boolean = true) {
         val path = playlist.getOrNull(currentIndex) ?: return
@@ -278,9 +290,11 @@ class MusicPlayerService : Service() {
 
     private fun pauseAtStart() {
         // Completion already stopped the native player. Do not pause an unprepared player.
-        if (isPrepared && mediaPlayer?.isPlaying == true) mediaPlayer?.pause()
+        withPreparedPlayer(Unit) { player ->
+            if (player.isPlaying) player.pause()
+            player.seekTo(0)
+        }
         playerState.pause()
-        seekTo(0)
         audioFocus.release()
         notification.remove()
         onPlaybackStateUpdated()
@@ -304,7 +318,7 @@ class MusicPlayerService : Service() {
     private fun onTrackChangedUpdated(path: String, isPlaying: Boolean) {
         listeners.toList().forEach { it.onTrackChanged(path, isPlaying) }
         updateMediaSessionMetadata(path)
-        updateMediaSessionPlaybackState(isPlaying)
+        updateMediaSessionPlaybackState()
         notification.update(
             getCurrentPath(), isPlaying(), mediaSession?.sessionToken,
             playerState.status == PlayerState.Status.PREPARING && playerState.playWhenReady
@@ -314,7 +328,7 @@ class MusicPlayerService : Service() {
     private fun onPlaybackStateUpdated() {
         val playing = isPlaying()
         listeners.toList().forEach { it.onPlaybackStateChanged(playing) }
-        updateMediaSessionPlaybackState(playing)
+        updateMediaSessionPlaybackState()
         notification.update(
             getCurrentPath(), isPlaying(), mediaSession?.sessionToken,
             playerState.status == PlayerState.Status.PREPARING && playerState.playWhenReady
@@ -344,7 +358,8 @@ class MusicPlayerService : Service() {
         )
     }
 
-    private fun updateMediaSessionPlaybackState(isPlaying: Boolean) {
+    private fun updateMediaSessionPlaybackState() {
+        val position = getCurrentPosition().toLong()
         val state = when (playerState.status) {
             PlayerState.Status.STOPPED -> PlaybackState.STATE_STOPPED
             PlayerState.Status.PREPARING -> if (playerState.playWhenReady) {
@@ -363,7 +378,7 @@ class MusicPlayerService : Service() {
         mediaSession?.setPlaybackState(
             PlaybackState.Builder()
                 .setActions(actions)
-                .setState(state, getCurrentPosition().toLong(), if (isPlaying) 1f else 0f)
+                .setState(state, position, if (state == PlaybackState.STATE_PLAYING) 1f else 0f)
                 .build()
         )
     }
