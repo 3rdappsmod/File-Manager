@@ -58,11 +58,8 @@ const val PRIMARY_VOLUME_NAME = "external_primary"
 // what else should we count as an audio except "audio/*" mimetype
 val extraAudioMimeTypes = arrayListOf("application/ogg")
 
-// extensions the built-in music player should treat as playable audio, even if not
-// recognized as such by the default mimetype lookup (e.g. call recording formats)
-val extraPlayableAudioExtensions = arrayListOf(
-    "ogg", "oga", "opus", "m4a", "aac", "flac", "wav", "wave", "amr", "awb"
-)
+// Supplement Commons audioExtensions; recognizing an extension does not guarantee codec support.
+val extraPlayableAudioExtensions = setOf("oga", "wave", "amr", "awb")
 val extraDocumentMimeTypes = arrayListOf(
     "application/pdf",
     "application/msword",

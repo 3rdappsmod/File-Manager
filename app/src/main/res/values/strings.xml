@@ -59,8 +59,8 @@
 
     <!-- Default apps -->
     <string name="default_apps">Default apps</string>
-    <string name="music_player_engine">Music player engine</string>
-    <string name="system_player">System player</string>
+    <string name="music_player_engine">Audio playback</string>
+    <string name="system_player">External app</string>
     <string name="built_in_player">Built-in player</string>
 
     <!-- Music player -->

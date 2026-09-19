@@ -4,7 +4,7 @@
     <string name="press_back_again">뒤로 가기 버튼을 한 번 더 누르면 종료됩니다</string>
     <string name="go_to_home_folder">홈 폴더로 이동</string>
     <string name="set_as_home_folder">홈 폴더로 설정</string>
-    <string name="home_folder_updated">홈 폴더가 업데이트되었습니다</string>
+    <string name="home_folder_updated">홈 폴더가 설정되었습니다</string>
     <string name="copy_path">경로를 클립보드에 복사</string>
     <string name="path_copied">경로가 복사되었습니다</string>
     <string name="select_audio_file">오디오 파일을 선택하세요</string>
@@ -39,7 +39,7 @@
     <string name="favorites_activity_placeholder">자주 사용하는 폴더를 즐겨찾기에 추가하면 어디서든 쉽게 접근할 수 있습니다.</string>
 
     <!-- File Editor -->
-    <string name="file_editor">파일 편집기</string>
+    <string name="file_editor">텍스트 편집기</string>
 
     <!-- Storage analysis -->
     <string name="storage_analysis">저장공간 분석</string>
@@ -59,8 +59,8 @@
 
     <!-- Default apps -->
     <string name="default_apps">기본 앱</string>
-    <string name="music_player_engine">음악 플레이어 엔진</string>
-    <string name="system_player">시스템 플레이어</string>
+    <string name="music_player_engine">오디오 재생 방식</string>
+    <string name="system_player">외부 앱</string>
     <string name="built_in_player">내장 플레이어</string>
 
     <!-- Music player -->
@@ -68,9 +68,9 @@
     <string name="playback_error">이 파일을 재생할 수 없습니다</string>
     <string name="play_pause">재생/일시정지</string>
     <string name="previous_track">이전 트랙</string>
-    <string name="repeat_mode_once">한번재생</string>
-    <string name="repeat_mode_repeat_one">반복재생</string>
-    <string name="repeat_mode_sequential">연달아재생</string>
+    <string name="repeat_mode_once">한 번 재생</string>
+    <string name="repeat_mode_repeat_one">한 곡 반복</string>
+    <string name="repeat_mode_sequential">연속 재생</string>
     <string name="next_track">다음 트랙</string>
 
     <!-- USB -->
