@@ -27,128 +27,130 @@
         android:fillViewport="true"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-    <LinearLayout
-        android:id="@+id/music_player_holder"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_horizontal"
-        android:orientation="vertical"
-        android:paddingStart="@dimen/activity_margin"
-        android:paddingTop="@dimen/activity_margin"
-        android:paddingEnd="@dimen/activity_margin"
-        android:paddingBottom="@dimen/activity_margin">
-
-        <Space
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <ImageView
-            android:id="@+id/music_player_album_art"
-            android:layout_width="160dp"
-            android:layout_height="160dp"
-            android:alpha="0.8"
-            android:contentDescription="@string/music_player"
-            android:padding="@dimen/activity_margin"
-            android:src="@drawable/ic_music_note_vector" />
-
-        <org.fossify.commons.views.MyTextView
-            android:id="@+id/music_player_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/activity_margin"
-            android:ellipsize="marquee"
-            android:gravity="center"
-            android:marqueeRepeatLimit="marquee_forever"
-            android:singleLine="true"
-            android:textSize="@dimen/bigger_text_size"
-            tools:text="song.mp3" />
-
-        <Space
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <SeekBar
-            android:id="@+id/music_player_seekbar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/normal_margin" />
-
-        <RelativeLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-
-            <org.fossify.commons.views.MyTextView
-                android:id="@+id/music_player_current_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentStart="true"
-                tools:text="0:00" />
-
-            <org.fossify.commons.views.MyTextView
-                android:id="@+id/music_player_total_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentEnd="true"
-                tools:text="3:45" />
-
-        </RelativeLayout>
-
         <LinearLayout
+            android:id="@+id/music_player_holder"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/normal_margin"
-            android:gravity="center"
-            android:orientation="horizontal">
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/activity_margin"
+            android:paddingTop="@dimen/activity_margin"
+            android:paddingEnd="@dimen/activity_margin"
+            android:paddingBottom="@dimen/activity_margin">
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
 
             <ImageView
-                android:id="@+id/music_player_previous"
-                android:layout_width="56dp"
-                android:layout_height="56dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/previous_track"
-                android:padding="@dimen/normal_margin"
-                android:src="@drawable/ic_skip_previous_vector" />
+                android:id="@+id/music_player_album_art"
+                android:layout_width="160dp"
+                android:layout_height="160dp"
+                android:alpha="0.8"
+                android:contentDescription="@string/music_player"
+                android:padding="@dimen/activity_margin"
+                android:src="@drawable/ic_music_note_vector" />
+
+            <org.fossify.commons.views.MyTextView
+                android:id="@+id/music_player_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/activity_margin"
+                android:ellipsize="marquee"
+                android:gravity="center"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:singleLine="true"
+                android:textSize="@dimen/bigger_text_size"
+                tools:text="song.mp3" />
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <SeekBar
+                android:id="@+id/music_player_seekbar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/normal_margin" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/music_player_current_time"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    tools:text="0:00" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/music_player_total_time"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:layout_weight="1"
+                    tools:text="3:45" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/normal_margin"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/music_player_previous"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/previous_track"
+                    android:padding="@dimen/normal_margin"
+                    android:src="@drawable/ic_skip_previous_vector" />
+
+                <ImageView
+                    android:id="@+id/music_player_play_pause"
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
+                    android:layout_marginStart="@dimen/big_margin"
+                    android:layout_marginEnd="@dimen/big_margin"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/play_pause"
+                    android:padding="@dimen/normal_margin"
+                    android:src="@drawable/ic_play_vector" />
+
+                <ImageView
+                    android:id="@+id/music_player_next"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/next_track"
+                    android:padding="@dimen/normal_margin"
+                    android:src="@drawable/ic_skip_next_vector" />
+
+            </LinearLayout>
 
             <ImageView
-                android:id="@+id/music_player_play_pause"
-                android:layout_width="72dp"
-                android:layout_height="72dp"
-                android:layout_marginStart="@dimen/big_margin"
-                android:layout_marginEnd="@dimen/big_margin"
+                android:id="@+id/music_player_repeat_mode"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="@dimen/normal_margin"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/play_pause"
-                android:padding="@dimen/normal_margin"
-                android:src="@drawable/ic_play_vector" />
+                android:contentDescription="@string/repeat_mode_once"
+                android:padding="@dimen/small_margin"
+                android:src="@drawable/ic_repeat_mode_once_vector" />
 
-            <ImageView
-                android:id="@+id/music_player_next"
-                android:layout_width="56dp"
-                android:layout_height="56dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/next_track"
-                android:padding="@dimen/normal_margin"
-                android:src="@drawable/ic_skip_next_vector" />
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="2" />
 
         </LinearLayout>
-
-        <ImageView
-            android:id="@+id/music_player_repeat_mode"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="@dimen/normal_margin"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/repeat_mode_once"
-            android:padding="@dimen/small_margin"
-            android:src="@drawable/ic_repeat_mode_once_vector" />
-
-        <Space
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="2" />
-
-    </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
