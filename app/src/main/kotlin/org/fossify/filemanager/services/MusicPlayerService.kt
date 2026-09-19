@@ -25,6 +25,7 @@ import org.fossify.filemanager.extensions.config
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_ONCE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL
+import org.fossify.filemanager.helpers.AudioStorage
 import java.io.IOException
 
 class MusicPlayerService : Service() {
@@ -154,7 +155,7 @@ class MusicPlayerService : Service() {
                         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                         .build()
                 )
-                setDataSource(path)
+                AudioStorage(this@MusicPlayerService).setDataSource(this, path)
                 setOnPreparedListener {
                     isPrepared = true
                     it.start()
