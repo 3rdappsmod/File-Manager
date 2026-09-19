@@ -14,6 +14,7 @@ import android.media.session.PlaybackState
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import android.support.v4.media.session.MediaSessionCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -25,6 +26,8 @@ import org.fossify.filemanager.extensions.config
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_ONCE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL
+import org.fossify.filemanager.helpers.PlaybackState as PlayerState
+import org.fossify.filemanager.helpers.isVisibleAudio
 import org.fossify.filemanager.helpers.AudioStorage
 import java.io.IOException
 
@@ -53,7 +56,8 @@ class MusicPlayerService : Service() {
     private var mediaSession: MediaSession? = null
     private var playlist = ArrayList<String>()
     private var currentIndex = 0
-    private var isPrepared = false
+    private val playerState = PlayerState()
+    private val isPrepared get() = playerState.isPrepared
     var listener: PlaybackListener? = null
     var repeatMode = MUSIC_PLAYER_REPEAT_MODE_ONCE
 
@@ -93,19 +97,33 @@ class MusicPlayerService : Service() {
     }
 
     fun togglePlayPause() {
-        val player = mediaPlayer ?: return
+        if (isPlaying() || playerState.playWhenReady) pause() else play()
+    }
+
+    fun play() {
+        if (isPlaying()) return
+        playerState.requestPlay()
+        if (playerState.status == PlayerState.Status.PREPARING) return
         if (!isPrepared) {
+            playCurrent()
             return
         }
-
-        if (player.isPlaying) {
-            player.pause()
-            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-        } else {
-            player.start()
+        try {
+            mediaPlayer?.start()
+            playerState.started()
             startForegroundWithNotification()
+            onPlaybackStateUpdated()
+        } catch (error: IllegalStateException) {
+            playbackFailed(error)
+        } catch (error: SecurityException) {
+            playbackFailed(error)
         }
+    }
 
+    fun pause() {
+        if (isPlaying()) mediaPlayer?.pause()
+        playerState.pause()
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         onPlaybackStateUpdated()
     }
 
@@ -123,19 +141,20 @@ class MusicPlayerService : Service() {
             currentIndex--
             playCurrent()
         } else {
-            mediaPlayer?.seekTo(0)
+            seekTo(0)
         }
     }
 
     fun seekTo(positionMs: Int) {
         if (isPrepared) {
-            mediaPlayer?.seekTo(positionMs)
+            mediaPlayer?.seekTo(positionMs.coerceIn(0, getDuration()))
+            updateMediaSessionPlaybackState(isPlaying())
         }
     }
 
     fun getCurrentPath() = playlist.getOrNull(currentIndex) ?: ""
 
-    fun isPlaying() = mediaPlayer?.isPlaying == true
+    fun isPlaying() = playerState.status == PlayerState.Status.PLAYING
 
     fun isPlaylistEmpty() = playlist.isEmpty()
 
@@ -146,9 +165,16 @@ class MusicPlayerService : Service() {
     private fun playCurrent() {
         val path = playlist.getOrNull(currentIndex) ?: return
         releaseMediaPlayer()
-        isPrepared = false
+        if (!isVisibleAudio(path, config.shouldShowHidden())) {
+            playbackFailed(SecurityException("Hidden audio is no longer visible"))
+            return
+        }
+        playerState.prepare()
+        onTrackChangedUpdated(path, false)
         try {
-            mediaPlayer = MediaPlayer().apply {
+            val player = MediaPlayer()
+            mediaPlayer = player
+            player.apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -157,28 +183,41 @@ class MusicPlayerService : Service() {
                 )
                 AudioStorage(this@MusicPlayerService).setDataSource(this, path)
                 setOnPreparedListener {
-                    isPrepared = true
-                    it.start()
-                    startForegroundWithNotification()
-                    onTrackChangedUpdated(path, true)
+                    if (mediaPlayer === it) {
+                        playerState.ready()
+                        updateMediaSessionMetadata(path)
+                        if (playerState.playWhenReady) play() else onPlaybackStateUpdated()
+                    }
                 }
                 setOnCompletionListener {
-                    onTrackCompleted()
+                    if (mediaPlayer === it) onTrackCompleted()
                 }
-                setOnErrorListener { _, _, _ ->
-                    isPrepared = false
-                    listener?.onError()
+                setOnErrorListener { failedPlayer, what, extra ->
+                    if (mediaPlayer === failedPlayer) {
+                        playbackFailed(IOException("MediaPlayer error: $what/$extra"))
+                    }
                     true
                 }
                 prepareAsync()
             }
-        } catch (e: IOException) {
-            listener?.onError()
-            return
-        } catch (e: IllegalArgumentException) {
-            listener?.onError()
-            return
+        } catch (error: IOException) {
+            playbackFailed(error)
+        } catch (error: IllegalArgumentException) {
+            playbackFailed(error)
+        } catch (error: IllegalStateException) {
+            playbackFailed(error)
+        } catch (error: SecurityException) {
+            playbackFailed(error)
         }
+    }
+
+    private fun playbackFailed(error: Exception) {
+        Log.w("MusicPlayerService", "Audio playback failed", error)
+        releaseMediaPlayer()
+        playerState.stop(failed = true)
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        onPlaybackStateUpdated()
+        listener?.onError()
     }
 
     private fun onTrackCompleted() {
@@ -190,23 +229,16 @@ class MusicPlayerService : Service() {
     }
 
     private fun replayCurrent() {
-        mediaPlayer?.apply {
-            seekTo(0)
-            start()
-        }
-        onPlaybackStateUpdated()
+        playerState.pause()
+        seekTo(0)
+        play()
     }
 
-    // used when there is nothing left to auto-advance to (once mode, or end of playlist):
-    // rewind to the beginning and pause, instead of tearing the player down, so the same
-    // track can be replayed from this screen without needing to reopen it
     private fun pauseAtStart() {
-        mediaPlayer?.apply {
-            if (isPlaying) {
-                pause()
-            }
-            seekTo(0)
-        }
+        // Completion already stopped the native player. Do not pause an unprepared player.
+        if (isPrepared && mediaPlayer?.isPlaying == true) mediaPlayer?.pause()
+        playerState.pause()
+        seekTo(0)
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         onPlaybackStateUpdated()
     }
@@ -214,20 +246,13 @@ class MusicPlayerService : Service() {
     private fun stopPlayback() {
         releaseMediaPlayer()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        onPlaybackStateUpdated()
         stopSelf()
     }
 
     private fun releaseMediaPlayer() {
-        isPrepared = false
-        mediaPlayer?.apply {
-            try {
-                if (isPlaying) {
-                    stop()
-                }
-            } catch (ignored: IllegalStateException) {
-            }
-            release()
-        }
+        playerState.stop()
+        mediaPlayer?.release()
         mediaPlayer = null
     }
 
@@ -248,11 +273,12 @@ class MusicPlayerService : Service() {
     private fun setupMediaSession() {
         mediaSession = MediaSession(this, "MusicPlayerService").apply {
             setCallback(object : MediaSession.Callback() {
-                override fun onPlay() = togglePlayPause()
-                override fun onPause() = togglePlayPause()
+                override fun onPlay() = play()
+                override fun onPause() = pause()
                 override fun onSkipToNext() = playNext()
                 override fun onSkipToPrevious() = playPrevious()
                 override fun onStop() = stopPlayback()
+                override fun onSeekTo(pos: Long) = seekTo(pos.coerceIn(0L, getDuration().toLong()).toInt())
             })
             isActive = true
         }
@@ -268,14 +294,21 @@ class MusicPlayerService : Service() {
     }
 
     private fun updateMediaSessionPlaybackState(isPlaying: Boolean) {
-        val state = if (isPlaying) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED
+        val state = when (playerState.status) {
+            PlayerState.Status.STOPPED -> PlaybackState.STATE_STOPPED
+            PlayerState.Status.PREPARING -> PlaybackState.STATE_BUFFERING
+            PlayerState.Status.PAUSED -> PlaybackState.STATE_PAUSED
+            PlayerState.Status.PLAYING -> PlaybackState.STATE_PLAYING
+            PlayerState.Status.ERROR -> PlaybackState.STATE_ERROR
+        }
         val actions = PlaybackState.ACTION_PLAY_PAUSE or PlaybackState.ACTION_SKIP_TO_NEXT or
-            PlaybackState.ACTION_SKIP_TO_PREVIOUS or PlaybackState.ACTION_STOP
+            PlaybackState.ACTION_SKIP_TO_PREVIOUS or PlaybackState.ACTION_STOP or
+            PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_SEEK_TO
 
         mediaSession?.setPlaybackState(
             PlaybackState.Builder()
                 .setActions(actions)
-                .setState(state, getCurrentPosition().toLong(), 1f)
+                .setState(state, getCurrentPosition().toLong(), if (isPlaying) 1f else 0f)
                 .build()
         )
     }
