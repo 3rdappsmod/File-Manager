@@ -7,24 +7,24 @@ import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Binder
 import android.os.Handler
-import android.os.PowerManager
-import android.os.Looper
 import android.os.IBinder
+import android.os.Looper
+import android.os.PowerManager
 import android.util.Log
+import java.io.IOException
 import org.fossify.commons.extensions.getFilenameFromPath
 import org.fossify.filemanager.extensions.config
+import org.fossify.filemanager.helpers.AudioFocus
+import org.fossify.filemanager.helpers.AudioStorage
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_ONCE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL
-import org.fossify.filemanager.helpers.PlaybackState as PlayerState
-import org.fossify.filemanager.helpers.isVisibleAudio
-import org.fossify.filemanager.helpers.StorageEvents
-import org.fossify.filemanager.helpers.isWithinStorage
-import org.fossify.filemanager.helpers.PlayerNotification
-import org.fossify.filemanager.helpers.AudioFocus
 import org.fossify.filemanager.helpers.PlaybackRequest
-import org.fossify.filemanager.helpers.AudioStorage
-import java.io.IOException
+import org.fossify.filemanager.helpers.PlaybackState as PlayerState
+import org.fossify.filemanager.helpers.PlayerNotification
+import org.fossify.filemanager.helpers.StorageEvents
+import org.fossify.filemanager.helpers.isVisibleAudio
+import org.fossify.filemanager.helpers.isWithinStorage
 
 // Binder commands and Android lifecycle callbacks share the main-thread playback owner.
 @Suppress("TooManyFunctions")

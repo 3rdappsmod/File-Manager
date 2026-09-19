@@ -2,17 +2,19 @@ package org.fossify.filemanager.activities
 
 import android.content.ComponentName
 import android.content.Context
-import android.content.res.ColorStateList
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.widget.SeekBar
 import androidx.lifecycle.Lifecycle
-import org.fossify.commons.extensions.getProperTextColor
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 import org.fossify.commons.extensions.getFilenameFromPath
+import org.fossify.commons.extensions.getProperTextColor
 import org.fossify.commons.extensions.toast
 import org.fossify.commons.extensions.updateTextColors
 import org.fossify.commons.extensions.viewBinding
@@ -24,9 +26,9 @@ import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_ONCE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL
 import org.fossify.filemanager.services.MusicPlayerService
-import java.util.Locale
-import java.util.concurrent.TimeUnit
 
+// Lifecycle, service and view callbacks are kept together to make subscription ownership explicit.
+@Suppress("TooManyFunctions")
 class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListener {
     companion object {
         const val EXTRA_PATH = "extra_path"
@@ -248,7 +250,7 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
     private fun formatDuration(millis: Int): String {
         val safeMillis = millis.coerceAtLeast(0).toLong()
         val minutes = TimeUnit.MILLISECONDS.toMinutes(safeMillis)
-        val seconds = TimeUnit.MILLISECONDS.toSeconds(safeMillis) % 60
+        val seconds = TimeUnit.MILLISECONDS.toSeconds(safeMillis) % TimeUnit.MINUTES.toSeconds(1)
         return String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
     }
 }
