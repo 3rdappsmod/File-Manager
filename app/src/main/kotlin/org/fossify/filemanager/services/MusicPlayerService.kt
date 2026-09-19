@@ -13,6 +13,8 @@ import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Binder
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.IBinder
 import android.util.Log
 import android.support.v4.media.session.MediaSessionCompat
@@ -28,6 +30,7 @@ import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL
 import org.fossify.filemanager.helpers.PlaybackState as PlayerState
 import org.fossify.filemanager.helpers.isVisibleAudio
+import org.fossify.filemanager.helpers.PlaybackRequest
 import org.fossify.filemanager.helpers.AudioStorage
 import java.io.IOException
 
@@ -58,7 +61,18 @@ class MusicPlayerService : Service() {
     private var currentIndex = 0
     private val playerState = PlayerState()
     private val isPrepared get() = playerState.isPrepared
-    var listener: PlaybackListener? = null
+    private val listeners = mutableSetOf<PlaybackListener>()
+    private val requests = PlaybackRequest()
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    fun addListener(listener: PlaybackListener) {
+        listeners.add(listener)
+        listener.onTrackChanged(getCurrentPath(), isPlaying())
+    }
+
+    fun removeListener(listener: PlaybackListener) {
+        listeners.remove(listener)
+    }
     var repeatMode = MUSIC_PLAYER_REPEAT_MODE_ONCE
 
     override fun onBind(intent: Intent?): IBinder = binder
@@ -81,19 +95,38 @@ class MusicPlayerService : Service() {
     }
 
     override fun onDestroy() {
+        requests.invalidate()
+        listeners.clear()
         releaseMediaPlayer()
         mediaSession?.release()
         super.onDestroy()
     }
 
-    fun startPlaylist(paths: ArrayList<String>, startIndex: Int) {
-        if (paths.isEmpty()) {
-            return
+    fun openPath(path: String, requestId: String) {
+        if (!requests.accept(requestId)) return
+        if (path == getCurrentPath() && isPrepared) return
+        releaseMediaPlayer()
+        playlist = arrayListOf(path)
+        currentIndex = 0
+        playerState.prepare()
+        onTrackChangedUpdated(path, false)
+        val generation = requests.generation
+        AudioStorage(applicationContext).loadPlaylist(path) { result ->
+            mainHandler.post {
+                if (generation == requests.generation) {
+                    result.onSuccess { paths ->
+                        if (paths.isEmpty()) {
+                            playbackFailed(SecurityException("No visible audio files"))
+                        } else {
+                            val autoPlay = playerState.playWhenReady
+                            playlist = ArrayList(paths)
+                            currentIndex = playlist.indexOf(path).coerceAtLeast(0)
+                            playCurrent(autoPlay)
+                        }
+                    }.onFailure { playbackFailed(IOException("Cannot load audio folder", it)) }
+                }
+            }
         }
-
-        playlist = paths
-        currentIndex = startIndex.coerceIn(0, paths.size - 1)
-        playCurrent()
     }
 
     fun togglePlayPause() {
@@ -162,7 +195,7 @@ class MusicPlayerService : Service() {
 
     fun getCurrentPosition() = if (isPrepared) mediaPlayer?.currentPosition ?: 0 else 0
 
-    private fun playCurrent() {
+    private fun playCurrent(autoPlay: Boolean = true) {
         val path = playlist.getOrNull(currentIndex) ?: return
         releaseMediaPlayer()
         if (!isVisibleAudio(path, config.shouldShowHidden())) {
@@ -170,6 +203,7 @@ class MusicPlayerService : Service() {
             return
         }
         playerState.prepare()
+        if (!autoPlay) playerState.pause()
         onTrackChangedUpdated(path, false)
         try {
             val player = MediaPlayer()
@@ -217,7 +251,7 @@ class MusicPlayerService : Service() {
         playerState.stop(failed = true)
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         onPlaybackStateUpdated()
-        listener?.onError()
+        listeners.toList().forEach { it.onError() }
     }
 
     private fun onTrackCompleted() {
@@ -244,6 +278,7 @@ class MusicPlayerService : Service() {
     }
 
     private fun stopPlayback() {
+        requests.invalidate()
         releaseMediaPlayer()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         onPlaybackStateUpdated()
@@ -257,7 +292,7 @@ class MusicPlayerService : Service() {
     }
 
     private fun onTrackChangedUpdated(path: String, isPlaying: Boolean) {
-        listener?.onTrackChanged(path, isPlaying)
+        listeners.toList().forEach { it.onTrackChanged(path, isPlaying) }
         updateMediaSessionMetadata(path)
         updateMediaSessionPlaybackState(isPlaying)
         updateNotification()
@@ -265,7 +300,7 @@ class MusicPlayerService : Service() {
 
     private fun onPlaybackStateUpdated() {
         val playing = isPlaying()
-        listener?.onPlaybackStateChanged(playing)
+        listeners.toList().forEach { it.onPlaybackStateChanged(playing) }
         updateMediaSessionPlaybackState(playing)
         updateNotification()
     }
@@ -346,7 +381,9 @@ class MusicPlayerService : Service() {
 
     private fun buildNotification(): Notification {
         val contentIntent = PendingIntent.getActivity(
-            this, 0, Intent(this, MusicPlayerActivity::class.java),
+            this, 0, Intent(this, MusicPlayerActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
