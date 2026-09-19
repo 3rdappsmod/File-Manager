@@ -3,10 +3,12 @@ package org.fossify.filemanager.extensions
 import android.app.Activity
 import android.content.Intent
 import androidx.core.content.FileProvider
+import java.io.File
+import java.util.UUID
 import org.fossify.commons.activities.BaseSimpleActivity
 import org.fossify.commons.extensions.getFilenameFromPath
-import org.fossify.commons.extensions.getParentPath
 import org.fossify.commons.extensions.getMimeTypeFromUri
+import org.fossify.commons.extensions.getParentPath
 import org.fossify.commons.extensions.launchActivityIntent
 import org.fossify.commons.extensions.openPathIntent
 import org.fossify.commons.extensions.renameFile
@@ -19,8 +21,6 @@ import org.fossify.filemanager.helpers.OPEN_AS_DEFAULT
 import org.fossify.filemanager.helpers.OPEN_AS_IMAGE
 import org.fossify.filemanager.helpers.OPEN_AS_TEXT
 import org.fossify.filemanager.helpers.OPEN_AS_VIDEO
-import java.util.UUID
-import java.io.File
 
 fun Activity.sharePaths(paths: ArrayList<String>) {
     sharePathsIntent(paths, BuildConfig.APPLICATION_ID)
