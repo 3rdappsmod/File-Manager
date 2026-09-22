@@ -17,25 +17,37 @@ private const val WATCHED_EVENTS = FileObserver.CREATE or FileObserver.DELETE or
  */
 class DirectoryObserver(private val path: String, private val onChanged: () -> Unit) {
     private val handler = Handler(Looper.getMainLooper())
-    private val pendingRefresh = Runnable { onChanged() }
+    // Lifecycle and event handling are serialized on the main looper.
+    private var active = false
+    private var generation = 0
+    private val pendingRefresh = Runnable { if (active) onChanged() }
     private var observer: FileObserver? = null
 
     fun start() {
+        close()
         if (!File(path).isDirectory) {
             return
         }
 
+        active = true
+        val currentGeneration = generation
         @Suppress("DEPRECATION")
         observer = object : FileObserver(path, WATCHED_EVENTS) {
             override fun onEvent(event: Int, relativePath: String?) {
-                handler.removeCallbacks(pendingRefresh)
-                handler.postDelayed(pendingRefresh, REFRESH_DEBOUNCE_MS)
+                handler.post {
+                    if (active && generation == currentGeneration) {
+                        handler.removeCallbacks(pendingRefresh)
+                        handler.postDelayed(pendingRefresh, REFRESH_DEBOUNCE_MS)
+                    }
+                }
             }
         }.apply { startWatching() }
     }
 
     fun close() {
-        handler.removeCallbacks(pendingRefresh)
+        active = false
+        generation++
+        handler.removeCallbacksAndMessages(null)
         observer?.stopWatching()
         observer = null
     }
