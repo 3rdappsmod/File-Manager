@@ -5,7 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import java.io.File
 
-private const val REFRESH_DEBOUNCE_MS = 400L
+private const val REFRESH_INTERVAL_MS = 400L
 private const val WATCHED_EVENTS = FileObserver.CREATE or FileObserver.DELETE or
     FileObserver.MOVED_FROM or FileObserver.MOVED_TO or FileObserver.MODIFY or
     FileObserver.CLOSE_WRITE or FileObserver.ATTRIB or FileObserver.DELETE_SELF or FileObserver.MOVE_SELF
@@ -20,7 +20,11 @@ class DirectoryObserver(private val path: String, private val onChanged: () -> U
     // Lifecycle and event handling are serialized on the main looper.
     private var active = false
     private var generation = 0
-    private val pendingRefresh = Runnable { if (active) onChanged() }
+    private var refreshPending = false
+    private val pendingRefresh = Runnable {
+        refreshPending = false
+        if (active) onChanged()
+    }
     private var observer: FileObserver? = null
 
     fun start() {
@@ -36,16 +40,23 @@ class DirectoryObserver(private val path: String, private val onChanged: () -> U
             override fun onEvent(event: Int, relativePath: String?) {
                 handler.post {
                     if (active && generation == currentGeneration) {
-                        handler.removeCallbacks(pendingRefresh)
-                        handler.postDelayed(pendingRefresh, REFRESH_DEBOUNCE_MS)
+                        scheduleRefresh()
                     }
                 }
             }
         }.apply { startWatching() }
     }
 
+    private fun scheduleRefresh() {
+        if (!refreshPending) {
+            refreshPending = true
+            handler.postDelayed(pendingRefresh, REFRESH_INTERVAL_MS)
+        }
+    }
+
     fun close() {
         active = false
+        refreshPending = false
         generation++
         handler.removeCallbacksAndMessages(null)
         observer?.stopWatching()
