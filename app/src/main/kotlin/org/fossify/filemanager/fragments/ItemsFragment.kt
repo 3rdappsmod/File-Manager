@@ -162,8 +162,17 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
         }.apply { start() }
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (currentPath.isNotEmpty()) {
+            watchDirectory(currentPath)
+        }
+    }
+
     override fun onDetachedFromWindow() {
         directoryObserver?.close()
+        directoryObserver = null
+        observedPath = ""
         super.onDetachedFromWindow()
     }
 
