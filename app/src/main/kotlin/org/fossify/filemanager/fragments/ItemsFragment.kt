@@ -21,6 +21,7 @@ import org.fossify.filemanager.databinding.ItemsFragmentBinding
 import org.fossify.filemanager.dialogs.CreateNewItemDialog
 import org.fossify.filemanager.extensions.config
 import org.fossify.filemanager.extensions.isPathOnRoot
+import org.fossify.filemanager.helpers.DirectoryObserver
 import org.fossify.filemanager.helpers.MAX_COLUMN_COUNT
 import org.fossify.filemanager.helpers.RootHelpers
 import org.fossify.filemanager.interfaces.ItemOperationsListener
@@ -38,6 +39,9 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
     private var storedItems = ArrayList<ListItem>()
     private var itemsIgnoringSearch = ArrayList<ListItem>()
     private lateinit var binding: ItemsFragmentBinding
+
+    private var directoryObserver: DirectoryObserver? = null
+    private var observedPath = ""
 
     override fun onFinishInflate() {
         super.onFinishInflate()
@@ -112,6 +116,7 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
         scrollStates[currentPath] = getScrollState()!!
         currentPath = realPath
         showHidden = context!!.config.shouldShowHidden()
+        watchDirectory(realPath)
         showProgressBar()
         getItems(currentPath) { originalPath, listItems ->
             if (currentPath != originalPath) {
@@ -141,6 +146,25 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
                 hideProgressBar()
             }
         }
+    }
+
+    private fun watchDirectory(path: String) {
+        if (observedPath == path) {
+            return
+        }
+
+        directoryObserver?.close()
+        observedPath = path
+        directoryObserver = DirectoryObserver(path) {
+            if (lastSearchedText.isEmpty()) {
+                refreshFragment()
+            }
+        }.apply { start() }
+    }
+
+    override fun onDetachedFromWindow() {
+        directoryObserver?.close()
+        super.onDetachedFromWindow()
     }
 
     private fun addItems(items: ArrayList<ListItem>, forceRefresh: Boolean = false) {
