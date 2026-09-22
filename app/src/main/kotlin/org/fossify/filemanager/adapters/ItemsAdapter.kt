@@ -131,6 +131,9 @@ class ItemsAdapter(
 ) : MyRecyclerViewAdapter(activity, recyclerView, itemClick),
     RecyclerViewFastScroller.OnPopupTextUpdate {
 
+    var isSelectionActive = false
+        private set
+
     private lateinit var fileDrawable: Drawable
     private lateinit var folderDrawable: Drawable
     private var fileDrawables = HashMap<String, Drawable>()
@@ -228,12 +231,15 @@ class ItemsAdapter(
     }
 
     override fun onActionModeCreated() {
+        isSelectionActive = true
         swipeRefreshLayout?.isRefreshing = false
         swipeRefreshLayout?.isEnabled = false
     }
 
     override fun onActionModeDestroyed() {
+        isSelectionActive = false
         swipeRefreshLayout?.isEnabled = config.enablePullToRefresh
+        listener?.selectionModeEnded()
     }
 
     override fun getItemViewType(position: Int): Int {

@@ -43,6 +43,8 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
     private var directoryObserver: DirectoryObserver? = null
     private var observedPath = ""
     private var directoryRefreshPending = false
+    private var directoryLoadGeneration = 0
+    private var directoryLoadInProgress = false
 
     override fun onFinishInflate() {
         super.onFinishInflate()
@@ -104,7 +106,7 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
         getRecyclerAdapter()?.finishActMode()
     }
 
-    fun openPath(path: String, forceRefresh: Boolean = false) {
+    fun openPath(path: String, forceRefresh: Boolean = false, fromDirectoryObserver: Boolean = false) {
         if ((activity as? BaseSimpleActivity)?.isAskingPermissions == true) {
             return
         }
@@ -119,6 +121,8 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
         showHidden = context!!.config.shouldShowHidden()
         watchDirectory(realPath)
         showProgressBar()
+        directoryLoadInProgress = true
+        val loadGeneration = ++directoryLoadGeneration
         getItems(currentPath) { originalPath, listItems ->
             if (currentPath != originalPath) {
                 return@getItems
@@ -137,18 +141,24 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
                 }
             }
 
-            itemsIgnoringSearch = listItems
             activity?.runOnUiThread {
-                if (lastSearchedText.isNotEmpty()) {
-                    directoryRefreshPending = true
+                if (!isCurrentDirectoryLoad(originalPath, loadGeneration)) {
                     return@runOnUiThread
                 }
+                directoryLoadInProgress = false
+                if (shouldDeferDirectoryLoad(fromDirectoryObserver)) {
+                    directoryRefreshPending = true
+                    hideProgressBar()
+                    return@runOnUiThread
+                }
+                itemsIgnoringSearch = listItems
                 (activity as? MainActivity)?.refreshMenuItems()
                 addItems(listItems, forceRefresh)
                 if (context != null && currentViewType != context!!.config.getFolderViewType(currentPath)) {
                     setupLayoutManager()
                 }
                 hideProgressBar()
+                refreshDirectoryIfReady()
             }
         }
     }
@@ -167,11 +177,25 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
         }.apply { start() }
     }
 
+    private fun isCurrentDirectoryLoad(path: String, generation: Int): Boolean {
+        return currentPath == path && generation == directoryLoadGeneration && isAttachedToWindow
+    }
+
+    private fun shouldDeferDirectoryLoad(fromDirectoryObserver: Boolean): Boolean {
+        return lastSearchedText.isNotEmpty() ||
+            (fromDirectoryObserver && getRecyclerAdapter()?.isSelectionActive == true)
+    }
+
     private fun refreshDirectoryIfReady() {
-        if (directoryRefreshPending && lastSearchedText.isEmpty() && isAttachedToWindow) {
-            directoryRefreshPending = false
-            refreshFragment()
-        }
+        if (!directoryRefreshPending || directoryLoadInProgress || !isAttachedToWindow) return
+        if (shouldDeferDirectoryLoad(fromDirectoryObserver = true)) return
+        directoryRefreshPending = false
+        openPath(currentPath, fromDirectoryObserver = true)
+    }
+
+    override fun selectionModeEnded() {
+        // Let the old action mode finish cleaning up before a refresh replaces its adapter.
+        post { refreshDirectoryIfReady() }
     }
 
     override fun onAttachedToWindow() {
@@ -182,6 +206,8 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
     }
 
     override fun onDetachedFromWindow() {
+        directoryLoadGeneration++
+        directoryLoadInProgress = false
         directoryObserver?.close()
         directoryObserver = null
         observedPath = ""
