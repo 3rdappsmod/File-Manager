@@ -3,6 +3,8 @@ package org.fossify.filemanager.interfaces
 import org.fossify.commons.models.FileDirItem
 
 interface ItemOperationsListener {
+    fun selectionModeEnded() = Unit
+
     fun refreshFragment()
 
     fun deleteFiles(files: ArrayList<FileDirItem>)
