@@ -42,6 +42,7 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
 
     private var directoryObserver: DirectoryObserver? = null
     private var observedPath = ""
+    private var directoryRefreshPending = false
 
     override fun onFinishInflate() {
         super.onFinishInflate()
@@ -138,6 +139,10 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
 
             itemsIgnoringSearch = listItems
             activity?.runOnUiThread {
+                if (lastSearchedText.isNotEmpty()) {
+                    directoryRefreshPending = true
+                    return@runOnUiThread
+                }
                 (activity as? MainActivity)?.refreshMenuItems()
                 addItems(listItems, forceRefresh)
                 if (context != null && currentViewType != context!!.config.getFolderViewType(currentPath)) {
@@ -155,11 +160,18 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
 
         directoryObserver?.close()
         observedPath = path
+        directoryRefreshPending = false
         directoryObserver = DirectoryObserver(path) {
-            if (lastSearchedText.isEmpty()) {
-                refreshFragment()
-            }
+            directoryRefreshPending = true
+            refreshDirectoryIfReady()
         }.apply { start() }
+    }
+
+    private fun refreshDirectoryIfReady() {
+        if (directoryRefreshPending && lastSearchedText.isEmpty() && isAttachedToWindow) {
+            directoryRefreshPending = false
+            refreshFragment()
+        }
     }
 
     override fun onAttachedToWindow() {
@@ -347,6 +359,7 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
                 text.isEmpty() -> {
                     itemsFastscroller.beVisible()
                     getRecyclerAdapter()?.updateItems(itemsIgnoringSearch)
+                    refreshDirectoryIfReady()
                     itemsPlaceholder.beGone()
                     itemsPlaceholder2.beGone()
                     hideProgressBar()
