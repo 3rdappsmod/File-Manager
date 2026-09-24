@@ -379,7 +379,7 @@ class ItemsAdapter(
         val manager = activity.getSystemService(ShortcutManager::class.java)
         if (manager.isRequestPinShortcutSupported) {
             val path = getFirstSelectedItemPath()
-            val drawable = resources.getDrawable(R.drawable.shortcut_folder).mutate()
+            val drawable = resources.getDrawable(R.drawable.shortcut_folder, activity.theme).mutate()
             getShortcutImage(path, drawable) {
                 val intent = Intent(activity, SplashActivity::class.java)
                 intent.action = Intent.ACTION_VIEW
@@ -421,7 +421,7 @@ class ItemsAdapter(
                     .load(getImagePathToLoad(path))
                     .apply(options)
                     .centerCrop()
-                    .into(size, size)
+                    .submit(size, size)
 
                 try {
                     val bitmap = builder.get()
@@ -876,7 +876,7 @@ class ItemsAdapter(
                             }
                         } else {
                             val mainFile = File(mainFilePath)
-                            for (file in mainFile.listFiles()) {
+                            for (file in mainFile.listFiles() ?: emptyArray()) {
                                 name = file.path.relativizeWith(base)
                                 if (activity.getIsPathDirectory(file.absolutePath)) {
                                     queue.push(file.absolutePath)
@@ -972,12 +972,14 @@ class ItemsAdapter(
 
     private fun getFirstSelectedItemPath() = getSelectedFileDirItems().first().path
 
+    @Suppress("UNCHECKED_CAST")
     private fun getSelectedFileDirItems(): ArrayList<FileDirItem> {
         return listItems.filter {
             selectedKeys.contains(it.path.hashCode())
         } as ArrayList<FileDirItem>
     }
 
+    @Suppress("UNCHECKED_CAST")
     fun updateItems(newItems: ArrayList<ListItem>, highlightText: String = "") {
         if (newItems.hashCode() != currentItemsHash) {
             currentItemsHash = newItems.hashCode()
@@ -1155,7 +1157,7 @@ class ItemsAdapter(
         folderDrawable =
             resources.getColoredDrawableWithColor(R.drawable.ic_folder_vector, properPrimaryColor)
         folderDrawable.alpha = 180
-        fileDrawable = resources.getDrawable(R.drawable.ic_file_generic)
+        fileDrawable = resources.getDrawable(R.drawable.ic_file_generic, activity.theme)
         fileDrawables = getFilePlaceholderDrawables(activity)
     }
 
