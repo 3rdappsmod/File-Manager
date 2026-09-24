@@ -64,6 +64,7 @@ open class SimpleActivity : BaseSimpleActivity() {
     }
 
     @SuppressLint("InlinedApi")
+    @Suppress("DEPRECATION")
     fun handleStoragePermission(callback: (granted: Boolean) -> Unit) {
         actionOnPermission = null
         if (hasStoragePermission()) {

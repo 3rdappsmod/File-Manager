@@ -3,6 +3,7 @@ package org.fossify.filemanager.activities
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import androidx.core.content.IntentCompat
 import org.fossify.commons.dialogs.FilePickerDialog
 import org.fossify.commons.extensions.*
 import org.fossify.commons.helpers.NavigationIcon
@@ -49,7 +50,7 @@ class SaveAsActivity : SimpleActivity() {
                                 }
                             }
 
-                            val source = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)!!
+                            val source = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)!!
                             val originalFilename = getFilenameFromContentUri(source)
                                 ?: source.toString().getFilenameFromPath()
                             val filename = sanitizeFilename(originalFilename)
