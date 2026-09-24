@@ -78,9 +78,7 @@ class DecompressItemsAdapter(activity: SimpleActivity, var listItems: MutableLis
         super.onViewRecycled(holder)
         if (!activity.isDestroyed && !activity.isFinishing) {
             ItemDecompressionListFileDirBinding.bind(holder.itemView).apply {
-                if (itemIcon != null) {
-                    Glide.with(activity).clear(itemIcon)
-                }
+                Glide.with(activity).clear(itemIcon)
             }
         }
     }
@@ -133,7 +131,7 @@ class DecompressItemsAdapter(activity: SimpleActivity, var listItems: MutableLis
     private fun initDrawables() {
         folderDrawable = resources.getColoredDrawableWithColor(R.drawable.ic_folder_vector, properPrimaryColor)
         folderDrawable.alpha = 180
-        fileDrawable = resources.getDrawable(R.drawable.ic_file_generic)
+        fileDrawable = resources.getDrawable(R.drawable.ic_file_generic, activity.theme)
         fileDrawables = getFilePlaceholderDrawables(activity)
     }
 }

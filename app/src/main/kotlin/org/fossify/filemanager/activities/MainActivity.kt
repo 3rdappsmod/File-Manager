@@ -7,6 +7,7 @@ import android.graphics.drawable.Drawable
 import android.media.RingtoneManager
 import android.os.Bundle
 import android.os.Handler
+import android.os.Looper
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.viewpager.widget.ViewPager
@@ -186,7 +187,7 @@ class MainActivity : SimpleActivity() {
             if (!wasBackJustPressed && config.pressBackTwice) {
                 wasBackJustPressed = true
                 toast(R.string.press_back_again)
-                Handler().postDelayed({
+                Handler(Looper.getMainLooper()).postDelayed({
                     wasBackJustPressed = false
                 }, BACK_PRESS_TIMEOUT.toLong())
                 return true
@@ -231,6 +232,7 @@ class MainActivity : SimpleActivity() {
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun setupOptionsMenu() {
         binding.mainMenu.apply {
             requireToolbar().inflateMenu(R.menu.menu)
@@ -469,7 +471,7 @@ class MainActivity : SimpleActivity() {
         if (config.OTGPath.isNotEmpty() && config.OTGPath == path.trimEnd('/')) {
             newPath = path
         } else if (file.exists() && !file.isDirectory) {
-            newPath = file.parent
+            newPath = file.parent ?: internalStoragePath
         } else if (!file.exists() && !isPathOnOTG(newPath)) {
             newPath = internalStoragePath
         }
