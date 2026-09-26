@@ -116,6 +116,7 @@ import org.fossify.filemanager.models.ListItem
 import java.io.BufferedInputStream
 import java.io.Closeable
 import org.fossify.filemanager.helpers.resolveArchiveEntry
+import org.fossify.filemanager.helpers.listFilesForArchive
 import java.io.File
 import java.util.LinkedList
 import java.util.Locale
@@ -877,7 +878,7 @@ class ItemsAdapter(
                             }
                         } else {
                             val mainFile = File(mainFilePath)
-                            for (file in mainFile.listFiles() ?: emptyArray()) {
+                            for (file in listFilesForArchive(mainFile)) {
                                 name = file.path.relativizeWith(base)
                                 if (activity.getIsPathDirectory(file.absolutePath)) {
                                     queue.push(file.absolutePath)

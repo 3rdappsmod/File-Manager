@@ -18,3 +18,8 @@ fun resolveArchiveEntry(destination: File, entryName: String): File {
     }
     return target
 }
+
+/** An unreadable or vanished directory must not become a successful empty archive. */
+fun listFilesForArchive(directory: File): Array<File> {
+    return directory.listFiles() ?: throw IOException("Cannot read directory: ${directory.path}")
+}
