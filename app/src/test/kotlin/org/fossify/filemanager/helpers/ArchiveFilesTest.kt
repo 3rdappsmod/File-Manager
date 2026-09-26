@@ -51,4 +51,18 @@ class ArchiveFilesTest {
         Files.createSymbolicLink(alias.toPath(), root.toPath())
         assertEquals(File(root, "file.txt"), resolveArchiveEntry(alias, "file.txt").canonicalFile)
     }
+    @Test
+    fun acceptsAnEmptyDirectory() {
+        assertEquals(0, listFilesForArchive(temporary.newFolder("empty")).size)
+    }
+
+    @Test
+    fun rejectsMissingDirectoryInsteadOfSilentlySkippingIt() {
+        assertThrows(IOException::class.java) { listFilesForArchive(File(temporary.root, "missing")) }
+    }
+
+    @Test
+    fun rejectsDirectoryReplacedByAFile() {
+        assertThrows(IOException::class.java) { listFilesForArchive(temporary.newFile("replaced")) }
+    }
 }
