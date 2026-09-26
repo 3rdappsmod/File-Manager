@@ -232,10 +232,10 @@ class MainActivity : SimpleActivity() {
         }
     }
 
-    @Suppress("DEPRECATION")
     private fun setupOptionsMenu() {
         binding.mainMenu.apply {
             requireToolbar().inflateMenu(R.menu.menu)
+            @Suppress("DEPRECATION")
             toggleHideOnScroll(false)
             setupMenu()
 
