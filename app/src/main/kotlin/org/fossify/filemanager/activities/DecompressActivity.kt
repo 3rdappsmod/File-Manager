@@ -29,6 +29,7 @@ import org.fossify.filemanager.extensions.config
 import org.fossify.filemanager.extensions.setLastModified
 import org.fossify.filemanager.models.ListItem
 import java.io.BufferedInputStream
+import org.fossify.filemanager.helpers.resolveArchiveEntry
 import java.io.File
 
 class DecompressActivity : SimpleActivity() {
@@ -161,21 +162,15 @@ class DecompressActivity : SimpleActivity() {
                 while (true) {
                     val entry = zipInputStream.nextEntry ?: break
                     val filename = filename.substringBeforeLast(".")
-                    val parent = "$destination/$filename"
-                    val newPath = "$parent/${entry.fileName.trimEnd('/')}"
+                    val parent = resolveArchiveEntry(File(destination), filename).path
+                    val outputFile = resolveArchiveEntry(File(parent), entry.fileName)
+                    val newPath = outputFile.path
 
 
                     if (!getDoesFilePathExist(parent)) {
                         if (!createDirectorySync(parent)) {
                             continue
                         }
-                    }
-
-                    val outputFile = File(newPath)
-
-                    val isVulnerableForZipPathTraversal = !outputFile.canonicalPath.startsWith(parent)
-                    if (isVulnerableForZipPathTraversal) {
-                        continue
                     }
 
                     if (entry.isDirectory) {
