@@ -42,6 +42,7 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
 
     private var directoryObserver: DirectoryObserver? = null
     private var observedPath = ""
+    private var directoryViewVisible = false
     private var directoryRefreshPending = false
     private var directoryLoadGeneration = 0
     private var directoryLoadInProgress = false
@@ -164,7 +165,7 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
     }
 
     private fun watchDirectory(path: String) {
-        if (observedPath == path) {
+        if (!directoryViewVisible || observedPath == path) {
             return
         }
 
@@ -182,8 +183,8 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
     }
 
     private fun shouldDeferDirectoryLoad(fromDirectoryObserver: Boolean): Boolean {
-        return lastSearchedText.isNotEmpty() ||
-            (fromDirectoryObserver && getRecyclerAdapter()?.isSelectionActive == true)
+        val blocked = !directoryViewVisible || getRecyclerAdapter()?.isSelectionActive == true
+        return lastSearchedText.isNotEmpty() || (fromDirectoryObserver && blocked)
     }
 
     private fun refreshDirectoryIfReady() {
@@ -198,6 +199,21 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
         post { refreshDirectoryIfReady() }
     }
 
+    override fun onVisibilityAggregated(isVisible: Boolean) {
+        super.onVisibilityAggregated(isVisible)
+        directoryViewVisible = isVisible
+        if (isVisible && currentPath.isNotEmpty()) {
+            watchDirectory(currentPath)
+            // Include changes made while the window was hidden, also for SAF paths.
+            directoryRefreshPending = true
+            refreshDirectoryIfReady()
+        } else if (!isVisible) {
+            directoryObserver?.close()
+            directoryObserver = null
+            observedPath = ""
+        }
+    }
+
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         if (currentPath.isNotEmpty()) {
@@ -206,6 +222,7 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
     }
 
     override fun onDetachedFromWindow() {
+        directoryViewVisible = false
         directoryLoadGeneration++
         directoryLoadInProgress = false
         directoryObserver?.close()
