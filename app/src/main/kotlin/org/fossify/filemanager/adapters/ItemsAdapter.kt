@@ -115,6 +115,7 @@ import org.fossify.filemanager.interfaces.ItemOperationsListener
 import org.fossify.filemanager.models.ListItem
 import java.io.BufferedInputStream
 import java.io.Closeable
+import org.fossify.filemanager.helpers.resolveArchiveEntry
 import java.io.File
 import java.util.LinkedList
 import java.util.Locale
@@ -682,11 +683,10 @@ class ItemsAdapter(
                     val fileDirItems = ArrayList<FileDirItem>()
                     var entry = zipInputStream.nextEntry
                     while (entry != null) {
-                        val currPath = if (entry.isDirectory) {
-                            path
-                        } else {
-                            "${path.getParentPath().trimEnd('/')}/${entry.fileName}"
-                        }
+                        val destination = resolveArchiveEntry(
+                            File(path.getParentPath()), path.getFilenameFromPath().dropLast(4)
+                        )
+                        val currPath = resolveArchiveEntry(destination, entry.fileName).path
                         val fileDirItem = FileDirItem(
                             path = currPath,
                             name = entry.fileName,
@@ -697,11 +697,11 @@ class ItemsAdapter(
                         fileDirItems.add(fileDirItem)
                         entry = zipInputStream.nextEntry
                     }
-                    val destinationPath = fileDirItems.first().getParentPath().trimEnd('/')
+                    val destinationPath = File(path.getParentPath(), path.getFilenameFromPath().dropLast(4)).path
                     activity.runOnUiThread {
                         activity.checkConflicts(fileDirItems, destinationPath, 0, LinkedHashMap()) {
                             ensureBackgroundThread {
-                                decompressPaths(sourcePaths, it, callback)
+                                decompressPaths(listOf(path), it, callback)
                             }
                         }
                     }
@@ -735,7 +735,8 @@ class ItemsAdapter(
                     val newFolderName = zipFileName.subSequence(0, zipFileName.length - 4)
                     while (entry != null) {
                         val parentPath = path.getParentPath()
-                        val newPath = "$parentPath/$newFolderName/${entry.fileName.trimEnd('/')}"
+                        val destination = resolveArchiveEntry(File(parentPath), newFolderName.toString())
+                        val newPath = resolveArchiveEntry(destination, entry.fileName).path
 
                         val resolution = getConflictResolution(conflictResolutions, newPath)
                         val doesPathExist = activity.getDoesFilePathExist(newPath)
