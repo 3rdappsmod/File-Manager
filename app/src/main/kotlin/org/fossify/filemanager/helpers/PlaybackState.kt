@@ -8,9 +8,13 @@ class PlaybackState {
         private set
     var playWhenReady = false
         private set
+    var waitingForFocus = false
+        private set
+    val isWaitingToPlay get() = playWhenReady && (status == Status.PREPARING || waitingForFocus)
     val isPrepared get() = status == Status.PAUSED || status == Status.PLAYING
 
     fun prepare() {
+        waitingForFocus = false
         status = Status.PREPARING
         playWhenReady = true
     }
@@ -23,17 +27,25 @@ class PlaybackState {
         playWhenReady = true
     }
 
+    fun awaitFocus() {
+        waitingForFocus = true
+        playWhenReady = true
+    }
+
     fun started() {
+        waitingForFocus = false
         status = Status.PLAYING
         playWhenReady = true
     }
 
     fun pause() {
+        waitingForFocus = false
         playWhenReady = false
         if (isPrepared) status = Status.PAUSED
     }
 
     fun stop(failed: Boolean = false) {
+        waitingForFocus = false
         status = if (failed) Status.ERROR else Status.STOPPED
         playWhenReady = false
     }

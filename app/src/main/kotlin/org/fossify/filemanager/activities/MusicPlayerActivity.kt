@@ -206,7 +206,8 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
     }
 
     private fun updatePlayPauseIcon(isPlaying: Boolean) {
-        val iconId = if (isPlaying) R.drawable.ic_pause_vector else R.drawable.ic_play_vector
+        val requested = isPlaying || musicService?.isPlayPending() == true
+        val iconId = if (requested) R.drawable.ic_pause_vector else R.drawable.ic_play_vector
         binding.musicPlayerPlayPause.setImageResource(iconId)
     }
 

@@ -41,7 +41,7 @@ class PlayerNotification(private val service: Service) {
     fun update(path: String, playing: Boolean, token: MediaSession.Token?, preparing: Boolean) {
         // Retain an existing foreground session between tracks; background promotion may be forbidden.
         if (playing || (preparing && foreground)) {
-            manager.notify(NOTIFICATION_ID, build(path, playing, token))
+            manager.notify(NOTIFICATION_ID, build(path, playing || preparing, token))
         } else {
             remove()
         }

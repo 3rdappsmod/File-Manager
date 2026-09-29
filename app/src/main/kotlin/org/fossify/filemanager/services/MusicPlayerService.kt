@@ -15,6 +15,7 @@ import java.io.IOException
 import org.fossify.commons.extensions.getFilenameFromPath
 import org.fossify.filemanager.extensions.config
 import org.fossify.filemanager.helpers.AudioFocus
+import org.fossify.filemanager.helpers.AudioFocusState
 import org.fossify.filemanager.helpers.AudioStorage
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_ONCE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE
@@ -49,7 +50,7 @@ class MusicPlayerService : Service() {
 
     private val binder = MusicPlayerBinder()
     private val notification by lazy { PlayerNotification(this) }
-    private val audioFocus by lazy { AudioFocus(this, ::pause) }
+    private val audioFocus by lazy { AudioFocus(this, ::pause, ::resumeAfterFocus) }
     private val storageEvents by lazy {
         StorageEvents(this, {}, { root ->
             if (getCurrentPath().isWithinStorage(root)) {
@@ -109,8 +110,16 @@ class MusicPlayerService : Service() {
     }
 
     fun openPath(path: String, requestId: String) {
-        if (!requests.accept(requestId)) return
-        if (path == getCurrentPath() && isPrepared) return
+        when (requests.accept(requestId, path == getCurrentPath() && isPrepared)) {
+            PlaybackRequest.Action.IGNORE -> return
+            PlaybackRequest.Action.RESUME -> {
+                play()
+                return
+            }
+            PlaybackRequest.Action.LOAD -> Unit
+        }
+        // Discard queued focus callbacks belonging to the previous selection.
+        audioFocus.release()
         releaseMediaPlayer()
         playlist = arrayListOf(path)
         currentIndex = 0
@@ -150,9 +159,17 @@ class MusicPlayerService : Service() {
         try {
             // Target 35+ requires a visible activity or foreground service before requesting focus.
             notification.start(getCurrentPath(), isPlaying(), mediaSession?.sessionToken)
-            if (!audioFocus.acquire()) {
-                pause()
-                return
+            when (audioFocus.acquire()) {
+                AudioFocusState.Result.GRANTED -> Unit
+                AudioFocusState.Result.DELAYED -> {
+                    playerState.awaitFocus()
+                    onPlaybackStateUpdated()
+                    return
+                }
+                AudioFocusState.Result.FAILED -> {
+                    pause()
+                    return
+                }
             }
             // stopSelf() may previously have cleared the started lifetime while an activity stayed bound.
             startService(Intent(this, MusicPlayerService::class.java))
@@ -165,6 +182,12 @@ class MusicPlayerService : Service() {
             playbackFailed(error)
         }
     }
+
+    private fun resumeAfterFocus() {
+        if (playerState.playWhenReady) play()
+    }
+
+    fun isPlayPending() = playerState.isWaitingToPlay
 
     fun pause() {
         if (isPlaying()) withPreparedPlayer(Unit) { it.pause() }
@@ -322,7 +345,7 @@ class MusicPlayerService : Service() {
         updateMediaSessionPlaybackState()
         notification.update(
             getCurrentPath(), isPlaying(), mediaSession?.sessionToken,
-            playerState.status == PlayerState.Status.PREPARING && playerState.playWhenReady
+            playerState.isWaitingToPlay
         )
     }
 
@@ -332,7 +355,7 @@ class MusicPlayerService : Service() {
         updateMediaSessionPlaybackState()
         notification.update(
             getCurrentPath(), isPlaying(), mediaSession?.sessionToken,
-            playerState.status == PlayerState.Status.PREPARING && playerState.playWhenReady
+            playerState.isWaitingToPlay
         )
     }
 
@@ -361,7 +384,7 @@ class MusicPlayerService : Service() {
 
     private fun updateMediaSessionPlaybackState() {
         val position = getCurrentPosition().toLong()
-        val state = when (playerState.status) {
+        val state = if (playerState.waitingForFocus) PlaybackState.STATE_BUFFERING else when (playerState.status) {
             PlayerState.Status.STOPPED -> PlaybackState.STATE_STOPPED
             PlayerState.Status.PREPARING -> if (playerState.playWhenReady) {
                 PlaybackState.STATE_BUFFERING
