@@ -21,7 +21,7 @@ class OpenAudioActivity : Activity() {
         }
 
         try {
-            startActivity(Intent(this, MusicPlayerActivity::class.java).apply {
+            startActivity(Intent(this, ExternalMusicPlayerActivity::class.java).apply {
                 if (uri.scheme == "content") {
                     setDataAndType(uri, intent.type)
                     clipData = ClipData.newRawUri("audio", uri)
