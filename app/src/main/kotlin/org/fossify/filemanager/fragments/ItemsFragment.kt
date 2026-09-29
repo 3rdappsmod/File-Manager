@@ -312,7 +312,7 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
         val lastModifieds = context!!.getFolderLastModifieds(path)
 
         for (file in files) {
-            val listItem = getListItemFromFile(file, isSortingBySize, lastModifieds, false)
+            val listItem = getListItemFromFile(file, isSortingBySize, lastModifieds, getProperChildCount)
             if (listItem != null) {
                 if (wantedMimeTypes.any { isProperMimeType(it, file.absolutePath, file.isDirectory) }) {
                     items.add(listItem)
@@ -320,21 +320,9 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
             }
         }
 
-        // send out the initial item list asap, get proper child count asynchronously as it can be slow
+        // Publish a complete snapshot, including zero counts. Deferred updates used to mutate
+        // an adapter belonging to a newer load and leave the ListItem hash out of sync.
         callback(path, items)
-
-        if (getProperChildCount) {
-            items.filter { it.mIsDirectory }.forEach {
-                if (context != null) {
-                    val childrenCount = it.getDirectChildrenCount(activity as BaseSimpleActivity, showHidden)
-                    if (childrenCount != 0) {
-                        activity?.runOnUiThread {
-                            getRecyclerAdapter()?.updateChildCount(it.mPath, childrenCount)
-                        }
-                    }
-                }
-            }
-        }
     }
 
     private fun getListItemFromFile(file: File, isSortingBySize: Boolean, lastModifieds: HashMap<String, Long>, getProperChildCount: Boolean): ListItem? {
