@@ -37,6 +37,15 @@ class ExternalAudioTest {
         val namespace = "http://schemas.android.com/apk/res/android"
         val gateway = elements.first { it.getAttributeNS(namespace, "name") == ".activities.OpenAudioActivity" }
         val player = elements.first { it.getAttributeNS(namespace, "name") == ".activities.MusicPlayerActivity" }
+        val external = elements.first {
+            it.getAttributeNS(namespace, "name") == ".activities.ExternalMusicPlayerActivity"
+        }
+        for (activity in listOf(gateway, external)) {
+            assertTrue(activity.hasAttributeNS(namespace, "taskAffinity"))
+            assertEquals("", activity.getAttributeNS(namespace, "taskAffinity"))
+            assertEquals("true", activity.getAttributeNS(namespace, "excludeFromRecents"))
+        }
+        assertEquals("false", external.getAttributeNS(namespace, "exported"))
         assertEquals("true", gateway.getAttributeNS(namespace, "exported"))
         assertEquals("false", player.getAttributeNS(namespace, "exported"))
         val actions = gateway.getElementsByTagName("action")

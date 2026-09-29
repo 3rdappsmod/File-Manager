@@ -31,7 +31,7 @@ import org.fossify.filemanager.services.MusicPlayerService
 
 // Lifecycle, service and view callbacks are kept together to make subscription ownership explicit.
 @Suppress("TooManyFunctions")
-class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListener {
+open class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListener {
     companion object {
         const val EXTRA_PATH = "extra_path"
         const val EXTRA_REQUEST_ID = "extra_request_id"
