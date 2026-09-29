@@ -1,5 +1,6 @@
 package org.fossify.filemanager.activities
 
+import android.content.ClipData
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -22,6 +23,7 @@ import org.fossify.commons.helpers.NavigationIcon
 import org.fossify.filemanager.R
 import org.fossify.filemanager.databinding.ActivityMusicPlayerBinding
 import org.fossify.filemanager.extensions.config
+import org.fossify.filemanager.helpers.isExternalAudioUri
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_ONCE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL
@@ -72,6 +74,7 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
         setupEdgeToEdge(padBottomSystem = listOf(binding.musicPlayerHolder))
 
         val serviceIntent = Intent(this, MusicPlayerService::class.java)
+        forwardAudioGrant(serviceIntent)
         startService(serviceIntent)
         isBound = bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
@@ -79,6 +82,9 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        val serviceIntent = Intent(this, MusicPlayerService::class.java)
+        forwardAudioGrant(serviceIntent)
+        startService(serviceIntent)
         startRequestedPlaylist()
     }
 
@@ -157,6 +163,15 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
                 }
             })
         }
+    }
+
+    private fun forwardAudioGrant(serviceIntent: Intent) {
+        val uri = intent.data ?: return
+        if (!isExternalAudioUri(uri.toString())) return
+        // A service grant survives closing the player activity for background playback/repeat.
+        serviceIntent.data = uri
+        serviceIntent.clipData = ClipData.newRawUri("audio", uri)
+        serviceIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
 
     private fun startRequestedPlaylist() {

@@ -23,6 +23,7 @@ import org.fossify.filemanager.helpers.PlaybackRequest
 import org.fossify.filemanager.helpers.PlaybackState as PlayerState
 import org.fossify.filemanager.helpers.PlayerNotification
 import org.fossify.filemanager.helpers.StorageEvents
+import org.fossify.filemanager.helpers.isExternalAudioUri
 import org.fossify.filemanager.helpers.isVisibleAudio
 import org.fossify.filemanager.helpers.isWithinStorage
 
@@ -221,7 +222,7 @@ class MusicPlayerService : Service() {
     private fun playCurrent(autoPlay: Boolean = true) {
         val path = playlist.getOrNull(currentIndex) ?: return
         releaseMediaPlayer()
-        if (!isVisibleAudio(path, config.shouldShowHidden())) {
+        if (!isExternalAudioUri(path) && !isVisibleAudio(path, config.shouldShowHidden())) {
             playbackFailed(SecurityException("Hidden audio is no longer visible"))
             return
         }
