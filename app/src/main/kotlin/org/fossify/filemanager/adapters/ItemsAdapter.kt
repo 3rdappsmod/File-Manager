@@ -50,8 +50,6 @@ import org.fossify.commons.extensions.convertToBitmap
 import org.fossify.commons.extensions.copyToClipboard
 import org.fossify.commons.extensions.createDirectorySync
 import org.fossify.commons.extensions.deleteFile
-import org.fossify.commons.extensions.deleteFileBg
-import org.fossify.commons.extensions.deleteFolderBg
 import org.fossify.commons.extensions.formatDate
 import org.fossify.commons.extensions.formatSize
 import org.fossify.commons.extensions.getAndroidSAFFileItems
@@ -113,7 +111,7 @@ import org.fossify.filemanager.helpers.OPEN_AS_VIDEO
 import org.fossify.filemanager.helpers.RootHelpers
 import org.fossify.filemanager.interfaces.ItemOperationsListener
 import org.fossify.filemanager.models.ListItem
-import java.io.BufferedInputStream
+import org.fossify.filemanager.helpers.forEachZipEntry
 import org.fossify.filemanager.helpers.resolveArchiveEntry
 import org.fossify.filemanager.helpers.validateArchiveDestination
 import org.fossify.filemanager.helpers.listFilesForArchive
@@ -679,107 +677,72 @@ class ItemsAdapter(
         sourcePaths: List<String>,
         callback: (success: Boolean) -> Unit
     ) {
-        sourcePaths.forEach { path ->
-            ZipInputStream(BufferedInputStream(activity.getFileInputStreamSync(path))).use { zipInputStream ->
-                try {
-                    val fileDirItems = ArrayList<FileDirItem>()
-                    var entry = zipInputStream.nextEntry
-                    while (entry != null) {
-                        val destination = resolveArchiveEntry(
-                            File(path.getParentPath()), path.getFilenameFromPath().dropLast(4)
-                        )
-                        val currPath = resolveArchiveEntry(destination, entry.fileName).path
-                        val fileDirItem = FileDirItem(
-                            path = currPath,
-                            name = entry.fileName,
-                            isDirectory = entry.isDirectory,
-                            children = 0,
-                            size = entry.uncompressedSize
-                        )
-                        fileDirItems.add(fileDirItem)
-                        entry = zipInputStream.nextEntry
-                    }
-                    val destinationPath = File(path.getParentPath(), path.getFilenameFromPath().dropLast(4)).path
-                    activity.runOnUiThread {
-                        activity.checkConflicts(fileDirItems, destinationPath, 0, LinkedHashMap()) {
-                            ensureBackgroundThread {
-                                decompressPaths(listOf(path), it, callback)
-                            }
+        val path = sourcePaths.firstOrNull()
+        if (path == null) {
+            callback(true)
+            return
+        }
+        try {
+            val destination = resolveArchiveEntry(File(path.getParentPath()), path.getFilenameFromPath().dropLast(4))
+            val fileDirItems = ArrayList<FileDirItem>()
+            forEachZipEntry({ activity.getFileInputStreamSync(path) }) { _, entry ->
+                fileDirItems.add(FileDirItem(
+                    path = resolveArchiveEntry(destination, entry.fileName).path,
+                    name = entry.fileName,
+                    isDirectory = entry.isDirectory,
+                    children = 0,
+                    size = entry.uncompressedSize
+                ))
+            }
+            // Process archives one at a time: only report success after the whole selection completes.
+            activity.runOnUiThread {
+                activity.checkConflicts(fileDirItems, destination.path, 0, LinkedHashMap()) { resolutions ->
+                    ensureBackgroundThread {
+                        if (decompressPath(path, resolutions)) {
+                            tryDecompressingPaths(sourcePaths.drop(1), callback)
+                        } else {
+                            callback(false)
                         }
                     }
-                } catch (zipException: ZipException) {
-                    if (zipException.type == ZipException.Type.WRONG_PASSWORD) {
-                        activity.showErrorToast(activity.getString(R.string.invalid_password))
-                    } else {
-                        activity.showErrorToast(zipException)
-                    }
-                } catch (exception: Exception) {
-                    activity.showErrorToast(exception)
                 }
             }
+        } catch (exception: ZipException) {
+            val message = if (exception.type == ZipException.Type.WRONG_PASSWORD) {
+                activity.getString(R.string.invalid_password)
+            } else {
+                exception.toString()
+            }
+            activity.showErrorToast(message)
+            callback(false)
+        } catch (exception: Exception) {
+            activity.showErrorToast(exception)
+            callback(false)
         }
     }
 
-    private fun decompressPaths(
-        paths: List<String>,
-        conflictResolutions: LinkedHashMap<String, Int>,
-        callback: (success: Boolean) -> Unit
-    ) {
-        paths.forEach { path ->
-            val zipInputStream =
-                ZipInputStream(BufferedInputStream(activity.getFileInputStreamSync(path)))
-
+    private fun decompressPath(path: String, conflictResolutions: LinkedHashMap<String, Int>): Boolean {
+        return try {
+            val destination = resolveArchiveEntry(File(path.getParentPath()), path.getFilenameFromPath().dropLast(4))
             val foldersTimestamp = mutableListOf<Pair<File, LocalFileHeader>>()
-            zipInputStream.use {
-                try {
-                    var entry = zipInputStream.nextEntry
-                    val zipFileName = path.getFilenameFromPath()
-                    val newFolderName = zipFileName.subSequence(0, zipFileName.length - 4)
-                    while (entry != null) {
-                        val parentPath = path.getParentPath()
-                        val destination = resolveArchiveEntry(File(parentPath), newFolderName.toString())
-                        val newPath = resolveArchiveEntry(destination, entry.fileName).path
-
-                        val resolution = getConflictResolution(conflictResolutions, newPath)
-                        val doesPathExist = activity.getDoesFilePathExist(newPath)
-                        if (doesPathExist && resolution == CONFLICT_OVERWRITE) {
-                            val fileDirItem = FileDirItem(
-                                path = newPath,
-                                name = newPath.getFilenameFromPath(),
-                                isDirectory = entry.isDirectory
-                            )
-                            if (activity.getIsPathDirectory(path)) {
-                                activity.deleteFolderBg(fileDirItem, false) {
-                                    if (it) {
-                                        extractEntry(newPath, entry, zipInputStream, foldersTimestamp)
-                                    } else {
-                                        callback(false)
-                                    }
-                                }
-                            } else {
-                                activity.deleteFileBg(fileDirItem, false, false) {
-                                    if (it) {
-                                        extractEntry(newPath, entry, zipInputStream, foldersTimestamp)
-                                    } else {
-                                        callback(false)
-                                    }
-                                }
-                            }
-                        } else if (!doesPathExist) {
-                            extractEntry(newPath, entry, zipInputStream, foldersTimestamp)
-                        }
-
-                        entry = zipInputStream.nextEntry
+            forEachZipEntry({ activity.getFileInputStreamSync(path) }) { zip, entry ->
+                val newPath = resolveArchiveEntry(destination, entry.fileName).path
+                val exists = activity.getDoesFilePathExist(newPath)
+                val overwrite = getConflictResolution(conflictResolutions, newPath) == CONFLICT_OVERWRITE
+                if (!exists || overwrite) {
+                    if (exists && activity.getIsPathDirectory(newPath) != entry.isDirectory) {
+                        // Do not remove a whole directory to replace it with a file, or vice versa.
+                        throw IOException("Archive entry conflicts with a different file type: $newPath")
                     }
-                    for ((dir, header) in foldersTimestamp.asReversed()) {
-                        dir.setLastModified(header)
-                    }
-                    callback(true)
-                } catch (e: Exception) {
-                    activity.showErrorToast(e)
-                    callback(false)
+                    // Opening the output truncates existing files. Existing directories are merged.
+                    // Asynchronous deletion callbacks cannot safely share this advancing ZIP stream.
+                    extractEntry(newPath, entry, zip, foldersTimestamp)
                 }
             }
+            foldersTimestamp.asReversed().forEach { (dir, header) -> dir.setLastModified(header) }
+            true
+        } catch (exception: Exception) {
+            activity.showErrorToast(exception)
+            false
         }
     }
 
