@@ -65,4 +65,41 @@ class ArchiveFilesTest {
     fun rejectsDirectoryReplacedByAFile() {
         assertThrows(IOException::class.java) { listFilesForArchive(temporary.newFile("replaced")) }
     }
+    @Test
+    fun rejectsArchiveInsideSourceBeforeCreatingIt() {
+        val source = temporary.newFolder("source")
+        val destination = File(source, "nested/result.zip")
+        assertThrows(IOException::class.java) { validateArchiveDestination(destination, listOf(source)) }
+        org.junit.Assert.assertFalse(destination.exists())
+    }
+
+    @Test
+    fun rejectsOverwritingASourceAndStorageAliases() {
+        val source = temporary.newFolder("source")
+        val alias = File(temporary.root, "alias")
+        Files.createSymbolicLink(alias.toPath(), source.toPath())
+        assertThrows(IOException::class.java) { validateArchiveDestination(File(alias, "out.zip"), listOf(source)) }
+        val file = temporary.newFile("input.zip")
+        assertThrows(IOException::class.java) { validateArchiveDestination(file, listOf(file)) }
+    }
+
+    @Test
+    fun allowsSiblingDestinationWithSimilarName() {
+        val source = temporary.newFolder("source")
+        validateArchiveDestination(File(temporary.root, "source-copy/result.zip"), listOf(source))
+    }
+
+    @Test
+    fun rejectsDirectoryLinkCyclesInsteadOfRecursingForever() {
+        val source = temporary.newFolder("source")
+        Files.createSymbolicLink(File(source, "loop").toPath(), source.toPath())
+        assertThrows(IOException::class.java) { listFilesForArchive(source) }
+    }
+    @Test
+    fun rejectsAFileLinkToTheGrowingOutputArchive() {
+        val source = temporary.newFolder("source")
+        val output = temporary.newFile("output.zip")
+        Files.createSymbolicLink(File(source, "output-link").toPath(), output.toPath())
+        assertThrows(IOException::class.java) { listFilesForArchive(source) }
+    }
 }

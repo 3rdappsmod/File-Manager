@@ -115,6 +115,7 @@ import org.fossify.filemanager.interfaces.ItemOperationsListener
 import org.fossify.filemanager.models.ListItem
 import java.io.BufferedInputStream
 import org.fossify.filemanager.helpers.resolveArchiveEntry
+import org.fossify.filemanager.helpers.validateArchiveDestination
 import org.fossify.filemanager.helpers.listFilesForArchive
 import java.io.IOException
 import java.io.File
@@ -829,7 +830,6 @@ class ItemsAdapter(
         password: String? = null
     ): Boolean {
         val queue = LinkedList<String>()
-        val fos = activity.getFileOutputStreamSync(targetPath, "application/zip") ?: return false
 
         fun zipEntry(name: String, lastModified: Long) = ZipParameters().also {
             it.fileNameInZip = name
@@ -841,6 +841,9 @@ class ItemsAdapter(
         }
 
         try {
+            validateArchiveDestination(File(targetPath), sourcePaths.map { File(it) })
+            val fos = activity.getFileOutputStreamSync(targetPath, "application/zip")
+                ?: throw IOException("Cannot open destination: $targetPath")
             fos.use { output ->
                 val zip = password?.let { ZipOutputStream(output, it.toCharArray()) } ?: ZipOutputStream(output)
                 zip.use { zout ->
