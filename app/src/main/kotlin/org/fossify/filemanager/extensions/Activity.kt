@@ -1,7 +1,9 @@
 package org.fossify.filemanager.extensions
 
 import android.app.Activity
+import android.content.ClipData
 import android.content.Intent
+import androidx.core.net.toUri
 import androidx.core.content.FileProvider
 import java.io.File
 import java.util.UUID
@@ -70,6 +72,11 @@ fun Activity.setAs(path: String) {
 
 fun Activity.openAudioInBuiltInPlayer(path: String) {
     Intent(this, MusicPlayerActivity::class.java).apply {
+        if (path.startsWith("content://")) {
+            data = path.toUri()
+            clipData = ClipData.newRawUri("audio", data!!)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
         putExtra(MusicPlayerActivity.EXTRA_PATH, path)
         putExtra(MusicPlayerActivity.EXTRA_REQUEST_ID, UUID.randomUUID().toString())
         addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
