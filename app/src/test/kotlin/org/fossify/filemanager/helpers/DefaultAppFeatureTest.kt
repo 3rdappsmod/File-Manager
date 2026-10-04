@@ -49,4 +49,27 @@ class DefaultAppFeatureTest {
             assertEquals("", DefaultAppFeature.savedChoice(feature, null, false))
         }
     }
+    @Test
+    fun spreadsheetFormatsUseTheirOwnDefaultIncludingCsvAndTsv() {
+        val extensions = listOf("xls", "xlsx", "xlsm", "xlsb", "xlt", "xltx", "xltm", "ods", "ots", "csv", "tsv")
+        extensions.forEach { extension ->
+            val mime = requireNotNull(DefaultAppFeature.spreadsheetMimeType("/storage/Report.$extension"))
+            assertEquals(DefaultAppFeature.SPREADSHEET, DefaultAppFeature.fromMimeType(mime))
+            org.junit.Assert.assertTrue(mime in DefaultAppFeature.SPREADSHEET.discoveryMimeTypes)
+        }
+        assertEquals(DefaultAppFeature.SPREADSHEET, DefaultAppFeature.fromMimeType(" Text/CSV; charset=UTF-8 "))
+        assertEquals(DefaultAppFeature.SPREADSHEET, DefaultAppFeature.fromMimeType("application/csv"))
+        assertEquals(DefaultAppFeature.TEXT, DefaultAppFeature.fromMimeType("text/*"))
+        assertEquals(DefaultAppFeature.TEXT, DefaultAppFeature.fromMimeType("text/plain"))
+    }
+
+    @Test
+    fun spreadsheetExtensionMatchingIsCaseInsensitiveAndDoesNotMatchParentNames() {
+        assertEquals(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            DefaultAppFeature.spreadsheetMimeType("/storage/REPORT.XLSX")
+        )
+        assertNull(DefaultAppFeature.spreadsheetMimeType("/storage/folder.xlsx/readme"))
+        assertNull(DefaultAppFeature.spreadsheetMimeType("/storage/report.xlsx.pdf"))
+    }
 }

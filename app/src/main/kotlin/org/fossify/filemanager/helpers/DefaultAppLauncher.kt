@@ -35,7 +35,11 @@ class DefaultAppLauncher(private val activity: Activity) {
 
     private fun prepare(path: String, forcedMime: String, forceChooser: Boolean, onOpened: () -> Unit) {
         val mime = forcedMime.ifEmpty {
-            if (path.startsWith("content://")) activity.getMimeTypeFromUri(path.toUri()) else path.getMimeType()
+            if (path.startsWith("content://")) {
+                activity.getMimeTypeFromUri(path.toUri())
+            } else {
+                DefaultAppFeature.spreadsheetMimeType(path) ?: path.getMimeType()
+            }
         }
         val feature = DefaultAppFeature.fromMimeType(mime)
             ?: if (forcedMime.isEmpty() && path.isPlayableAudioFast()) DefaultAppFeature.AUDIO else null

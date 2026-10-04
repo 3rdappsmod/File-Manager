@@ -61,7 +61,10 @@ class DefaultAppsActivity : SimpleActivity() {
         // Discovery only: no file is created and no URI permission is granted from this screen.
         val uri = "content://$packageName.provider/default-app".toUri()
         ensureBackgroundThread {
-            val targets = DefaultAppTargets(this).find(feature, uri, feature.mimeType)
+            val finder = DefaultAppTargets(this)
+            val targets = feature.discoveryMimeTypes.flatMap { mime -> finder.find(feature, uri, mime) }
+                .distinctBy { it.id }
+                .sortedBy { it.label.lowercase() }
             runOnUiThread {
                 if (!isFinishing && !isDestroyed) showChoices(feature, targets)
             }
