@@ -13,8 +13,6 @@ import org.fossify.filemanager.R
 import org.fossify.filemanager.databinding.ActivitySettingsBinding
 import org.fossify.filemanager.dialogs.ManageVisibleTabsDialog
 import org.fossify.filemanager.extensions.config
-import org.fossify.filemanager.helpers.MUSIC_PLAYER_ENGINE_BUILT_IN
-import org.fossify.filemanager.helpers.MUSIC_PLAYER_ENGINE_SYSTEM
 import org.fossify.filemanager.helpers.RootHelpers
 import java.util.Locale
 import kotlin.system.exitProcess
@@ -41,7 +39,7 @@ class SettingsActivity : SimpleActivity() {
         setupManageFavorites()
         setupManageShownTabs()
         setupChangeDateTimeFormat()
-        setupMusicPlayerEngine()
+        setupDefaultApps()
         setupFontSize()
         setupShowHidden()
         setupEnablePullToRefresh()
@@ -115,28 +113,11 @@ class SettingsActivity : SimpleActivity() {
         }
     }
 
-    private fun setupMusicPlayerEngine() {
-        binding.settingsMusicPlayerEngine.text = getMusicPlayerEngineText()
-        binding.settingsMusicPlayerEngineHolder.setOnClickListener {
-            val items = arrayListOf(
-                RadioItem(MUSIC_PLAYER_ENGINE_SYSTEM, getString(R.string.system_player)),
-                RadioItem(MUSIC_PLAYER_ENGINE_BUILT_IN, getString(R.string.built_in_player))
-            )
-
-            RadioGroupDialog(this@SettingsActivity, items, config.musicPlayerEngine) {
-                config.musicPlayerEngine = it as Int
-                binding.settingsMusicPlayerEngine.text = getMusicPlayerEngineText()
-            }
+    private fun setupDefaultApps() {
+        binding.settingsFeatureDefaultsHolder.setOnClickListener {
+            startActivity(Intent(this, DefaultAppsActivity::class.java))
         }
     }
-
-    private fun getMusicPlayerEngineText() = getString(
-        if (config.musicPlayerEngine == MUSIC_PLAYER_ENGINE_BUILT_IN) {
-            R.string.built_in_player
-        } else {
-            R.string.system_player
-        }
-    )
 
     private fun setupFontSize() {
         binding.settingsFontSize.text = getFontSizeText()

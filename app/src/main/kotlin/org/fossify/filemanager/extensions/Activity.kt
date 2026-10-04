@@ -10,12 +10,12 @@ import org.fossify.commons.extensions.getFilenameFromPath
 import org.fossify.commons.extensions.getMimeTypeFromUri
 import org.fossify.commons.extensions.getParentPath
 import org.fossify.commons.extensions.launchActivityIntent
-import org.fossify.commons.extensions.openPathIntent
 import org.fossify.commons.extensions.renameFile
 import org.fossify.commons.extensions.setAsIntent
 import org.fossify.commons.extensions.sharePathsIntent
 import org.fossify.filemanager.BuildConfig
 import org.fossify.filemanager.activities.MusicPlayerActivity
+import org.fossify.filemanager.helpers.DefaultAppLauncher
 import org.fossify.filemanager.helpers.OPEN_AS_AUDIO
 import org.fossify.filemanager.helpers.OPEN_AS_DEFAULT
 import org.fossify.filemanager.helpers.OPEN_AS_IMAGE
@@ -39,16 +39,20 @@ fun Activity.tryOpenPathIntent(path: String, forceChooser: Boolean, openAsType: 
             launchActivityIntent(this)
         }
     } else {
-        openPath(path, forceChooser, openAsType)
-
-        if (finishActivity) {
-            finish()
+        openPath(path, forceChooser, openAsType) {
+            if (finishActivity) finish()
         }
     }
 }
 
-fun Activity.openPath(path: String, forceChooser: Boolean, openAsType: Int = OPEN_AS_DEFAULT) {
-    openPathIntent(path, forceChooser, BuildConfig.APPLICATION_ID, getMimeType(openAsType))
+fun Activity.openPath(
+    path: String,
+    forceChooser: Boolean,
+    openAsType: Int = OPEN_AS_DEFAULT,
+    onOpened: () -> Unit = {}
+) {
+    val mime = getMimeType(openAsType)
+    DefaultAppLauncher(this).open(path, mime, forceChooser, onOpened)
 }
 
 private fun getMimeType(type: Int) = when (type) {

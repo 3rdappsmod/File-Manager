@@ -59,8 +59,6 @@
 
     <!-- Default apps -->
     <string name="default_apps">Default apps</string>
-    <string name="music_player_engine">Audio playback</string>
-    <string name="system_player">External app</string>
     <string name="built_in_player">Built-in player</string>
 
     <!-- Music player -->
@@ -80,4 +78,21 @@
         Haven't found some strings? There's more at
         https://github.com/FossifyOrg/Commons/tree/master/commons/src/main/res
     -->
+
+    <!-- Per-function defaults within File Manager -->
+    <string name="feature_default_title">Default apps by function</string>
+    <string name="feature_default_description">Applies when opening files in File Manager.</string>
+    <string name="feature_default_text">Edit text</string>
+    <string name="feature_default_image">View images</string>
+    <string name="feature_default_pdf">Open PDF files</string>
+    <string name="feature_default_audio">Play audio</string>
+    <string name="feature_default_video">Play videos</string>
+    <string name="feature_default_ask">Ask every time (reset default)</string>
+    <string name="feature_default_unavailable">App unavailable — choose again</string>
+    <string name="feature_default_once">Just once</string>
+    <string name="feature_default_always">Always</string>
+    <string name="feature_default_reset_all">Reset all default apps</string>
+    <string name="feature_default_reset_confirm">Reset all functions to ask which app to use each time?</string>
+    <string name="feature_default_no_apps">No apps can open this file.</string>
+    <string name="feature_default_open_failed">Cannot access this file.</string>
 </resources>
