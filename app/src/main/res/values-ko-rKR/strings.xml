@@ -95,4 +95,5 @@
     <string name="feature_default_reset_confirm">모든 기능의 기본 앱을 초기화하고 파일을 열 때마다 앱을 선택하시겠습니까?</string>
     <string name="feature_default_no_apps">이 파일을 열 수 있는 앱이 없습니다.</string>
     <string name="feature_default_open_failed">이 파일에 접근할 수 없습니다.</string>
+    <string name="feature_default_spreadsheet">엑셀·스프레드시트</string>
 </resources>
