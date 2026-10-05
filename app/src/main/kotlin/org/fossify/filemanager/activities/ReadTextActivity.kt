@@ -27,6 +27,8 @@ import org.fossify.filemanager.dialogs.SaveAsDialog
 import org.fossify.filemanager.extensions.openPath
 import org.fossify.filemanager.views.GestureEditText
 import java.io.File
+import java.io.IOException
+import org.fossify.filemanager.helpers.writeEditedText
 import java.io.OutputStream
 
 class ReadTextActivity : SimpleActivity() {
@@ -40,6 +42,8 @@ class ReadTextActivity : SimpleActivity() {
 
     private var filePath = ""
     private var originalText = ""
+    private var sourceUri: Uri? = null
+    private var isSaving = false
     private var searchIndex = 0
     private var savePrompt: AlertDialog? = null
     private var searchMatches = emptyList<Int>()
@@ -79,6 +83,7 @@ class ReadTextActivity : SimpleActivity() {
             return
         }
 
+        sourceUri = uri
         val filename = getFilenameFromUri(uri)
         if (filename.isNotEmpty()) {
             binding.readTextToolbar.title = Uri.decode(filename)
@@ -109,19 +114,18 @@ class ReadTextActivity : SimpleActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
         super.onActivityResult(requestCode, resultCode, resultData)
-        if (requestCode == SELECT_SAVE_FILE_INTENT && resultCode == Activity.RESULT_OK && resultData != null && resultData.data != null) {
-            val outputStream = contentResolver.openOutputStream(resultData.data!!)
-
-            val shouldExitAfterSaving = requestCode == SELECT_SAVE_FILE_AND_EXIT_INTENT
-
-            val selectedFilePath = getRealPathFromURI(intent.data!!)
-            val shouldOverwriteOriginalText = selectedFilePath == filePath
-
-            saveTextContent(outputStream, shouldExitAfterSaving, shouldOverwriteOriginalText)
-        }
+        if (requestCode != SELECT_SAVE_FILE_INTENT && requestCode != SELECT_SAVE_FILE_AND_EXIT_INTENT) return
+        if (resultCode != Activity.RESULT_OK) return
+        val destination = resultData?.data ?: return
+        val shouldExit = requestCode == SELECT_SAVE_FILE_AND_EXIT_INTENT
+        // Compare the returned destination, not the original intent's URI.
+        val overwritesOriginal = destination == sourceUri ||
+            (filePath.isNotEmpty() && getRealPathFromURI(destination) == filePath)
+        saveTextContent({ contentResolver.openOutputStream(destination, "wt") }, shouldExit, overwritesOriginal)
     }
 
     override fun onBackPressedCompat(): Boolean {
+        if (isSaving) return true
         val hasUnsavedChanges = originalText != binding.readTextView.text.toString()
         return when {
             isSearchActive -> {
@@ -152,6 +156,7 @@ class ReadTextActivity : SimpleActivity() {
 
     private fun setupOptionsMenu() {
         binding.readTextToolbar.setOnMenuItemClickListener { menuItem ->
+            if (isSaving) return@setOnMenuItemClickListener true
             when (menuItem.itemId) {
                 R.id.menu_search -> openSearch()
                 R.id.menu_save -> saveText()
@@ -179,7 +184,7 @@ class ReadTextActivity : SimpleActivity() {
 
     private fun updateFilePath() {
         if (filePath.isEmpty()) {
-            filePath = getRealPathFromURI(intent.data!!) ?: ""
+            filePath = sourceUri?.let { getRealPathFromURI(it) }.orEmpty()
         }
     }
 
@@ -206,9 +211,9 @@ class ReadTextActivity : SimpleActivity() {
             SaveAsDialog(this, filePath, false) { path, _ ->
                 if (hasStoragePermission()) {
                     val file = File(path)
-                    getFileOutputStream(file.toFileDirItem(this), true) {
+                    getFileOutputStream(file.toFileDirItem(this), true) { output ->
                         val shouldOverwriteOriginalText = path == filePath
-                        saveTextContent(it, shouldExitAfterSaving, shouldOverwriteOriginalText)
+                        saveTextContent({ output }, shouldExitAfterSaving, shouldOverwriteOriginalText)
                     }
                 } else {
                     toast(R.string.no_storage_permissions)
@@ -218,36 +223,63 @@ class ReadTextActivity : SimpleActivity() {
     }
 
     private fun saveText(shouldExitAfterSaving: Boolean = false) {
+        val uri = sourceUri
+        if (uri?.scheme == "content") {
+            // A content URI is the authoritative location; cloud/SAF documents need no filesystem path.
+            saveTextContent({ contentResolver.openOutputStream(uri, "wt") }, shouldExitAfterSaving, true) {
+                saveAsText(shouldExitAfterSaving)
+            }
+            return
+        }
         updateFilePath()
 
         if (filePath.isEmpty()) {
             saveAsText(shouldExitAfterSaving)
         } else if (hasStoragePermission()) {
             val file = File(filePath)
-            getFileOutputStream(file.toFileDirItem(this), true) {
-                saveTextContent(it, shouldExitAfterSaving, true)
+            getFileOutputStream(file.toFileDirItem(this), true) { output ->
+                saveTextContent({ output }, shouldExitAfterSaving, true)
             }
         } else {
             toast(R.string.no_storage_permissions)
         }
     }
 
-    private fun saveTextContent(outputStream: OutputStream?, shouldExitAfterSaving: Boolean, shouldOverwriteOriginalText: Boolean) {
-        if (outputStream != null) {
-            val currentText = binding.readTextView.text.toString()
-            outputStream.bufferedWriter().use { it.write(currentText) }
-            toast(R.string.file_saved)
-            hideKeyboard()
-
-            if (shouldOverwriteOriginalText) {
-                originalText = currentText
+    private fun saveTextContent(
+        openOutput: () -> OutputStream?,
+        shouldExitAfterSaving: Boolean,
+        shouldOverwriteOriginalText: Boolean,
+        onAccessDenied: (() -> Unit)? = null
+    ) {
+        val currentText = binding.readTextView.text.toString()
+        isSaving = true
+        ensureBackgroundThread {
+            val failure = try {
+                writeEditedText(openOutput, currentText)
+                null
+            } catch (error: IOException) {
+                error
+            } catch (error: SecurityException) {
+                error
+            } catch (error: IllegalArgumentException) {
+                error
             }
-
-            if (shouldExitAfterSaving) {
-                performDefaultBack()
+            runOnUiThread {
+                isSaving = false
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (failure != null) {
+                    showErrorToast(failure)
+                    if (failure is SecurityException) onAccessDenied?.invoke()
+                } else {
+                    toast(R.string.file_saved)
+                    if (shouldOverwriteOriginalText) originalText = currentText
+                    // Edits made while saving remain dirty and must not be lost on exit.
+                    if (shouldExitAfterSaving && binding.readTextView.text.toString() == currentText) {
+                        hideKeyboard()
+                        performDefaultBack()
+                    }
+                }
             }
-        } else {
-            toast(R.string.unknown_error_occurred)
         }
     }
 
