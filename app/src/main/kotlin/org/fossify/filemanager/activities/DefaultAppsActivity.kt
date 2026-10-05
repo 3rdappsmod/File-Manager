@@ -11,6 +11,7 @@ import org.fossify.filemanager.R
 import org.fossify.filemanager.databinding.ActivityDefaultAppsBinding
 import org.fossify.filemanager.databinding.ItemDefaultAppBinding
 import org.fossify.filemanager.extensions.config
+import org.fossify.filemanager.helpers.DefaultAppChoice
 import org.fossify.filemanager.helpers.DefaultAppFeature
 import org.fossify.filemanager.helpers.DefaultAppTarget
 import org.fossify.filemanager.helpers.DefaultAppTargets
@@ -63,7 +64,7 @@ class DefaultAppsActivity : SimpleActivity() {
         ensureBackgroundThread {
             val finder = DefaultAppTargets(this)
             val targets = feature.discoveryMimeTypes.flatMap { mime -> finder.find(feature, uri, mime) }
-                .distinctBy { it.id }
+                .distinctBy { DefaultAppChoice.key(it.id) }
                 .sortedBy { it.label.lowercase() }
             runOnUiThread {
                 if (!isFinishing && !isDestroyed) showChoices(feature, targets)
@@ -73,7 +74,8 @@ class DefaultAppsActivity : SimpleActivity() {
 
     private fun showChoices(feature: DefaultAppFeature, targets: List<DefaultAppTarget>) {
         val labels = listOf(getString(R.string.feature_default_ask)) + targets.map { it.label }
-        var selected = targets.indexOfFirst { it.id == config.defaultApps.get(feature) } + 1
+        val saved = config.defaultApps.get(feature)
+        var selected = targets.indexOfFirst { DefaultAppChoice.matches(saved, it.id) } + 1
         MaterialAlertDialogBuilder(this)
             .setTitle(feature.title)
             .setSingleChoiceItems(labels.toTypedArray(), selected) { _, index -> selected = index }
