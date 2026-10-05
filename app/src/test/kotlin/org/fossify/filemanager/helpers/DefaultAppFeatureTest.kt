@@ -21,7 +21,7 @@ class DefaultAppFeatureTest {
 
     @Test
     fun unsupportedFilesAndOpenAsOtherKeepTheSystemFlow() {
-        listOf("", "*/*", "application/zip", "application/octet-stream", "application/vnd.android.package-archive")
+        listOf("", "*/*", "application/zip", "application/octet-stream")
             .forEach { assertNull(DefaultAppFeature.fromMimeType(it)) }
     }
 
@@ -71,5 +71,13 @@ class DefaultAppFeatureTest {
         )
         assertNull(DefaultAppFeature.spreadsheetMimeType("/storage/folder.xlsx/readme"))
         assertNull(DefaultAppFeature.spreadsheetMimeType("/storage/report.xlsx.pdf"))
+    }
+    @Test
+    fun apkUsesAnIndependentDefaultAndCaseInsensitiveExtension() {
+        assertEquals(DefaultAppFeature.APK, DefaultAppFeature.fromMimeType("application/vnd.android.package-archive"))
+        assertEquals(DefaultAppFeature.APK.mimeType, DefaultAppFeature.fileMimeType("/storage/App.APK"))
+        assertNull(DefaultAppFeature.fileMimeType("/storage/App.apk.txt"))
+        assertEquals(DefaultAppFeature.TEXT, DefaultAppFeature.fromMimeType("text/*"))
+        assertNull(DefaultAppFeature.fromMimeType("*/*"))
     }
 }

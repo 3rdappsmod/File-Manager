@@ -96,4 +96,5 @@
     <string name="feature_default_no_apps">이 파일을 열 수 있는 앱이 없습니다.</string>
     <string name="feature_default_open_failed">이 파일에 접근할 수 없습니다.</string>
     <string name="feature_default_spreadsheet">엑셀·스프레드시트</string>
+    <string name="feature_default_apk">앱 설치 (APK)</string>
 </resources>

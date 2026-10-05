@@ -8,6 +8,7 @@ enum class DefaultAppFeature(val key: String, val title: Int, val mimeType: Stri
     IMAGE("image", R.string.feature_default_image, "image/*"),
     PDF("pdf", R.string.feature_default_pdf, "application/pdf"),
     SPREADSHEET("spreadsheet", R.string.feature_default_spreadsheet, "application/vnd.ms-excel"),
+    APK("apk", R.string.feature_default_apk, "application/vnd.android.package-archive"),
     AUDIO("audio", R.string.feature_default_audio, "audio/*"),
     VIDEO("video", R.string.feature_default_video, "video/*");
 
@@ -33,12 +34,16 @@ enum class DefaultAppFeature(val key: String, val title: Int, val mimeType: Stri
             "tsv" to "text/tab-separated-values"
         )
 
+        fun fileMimeType(path: String): String? =
+            if (path.endsWith(".apk", ignoreCase = true)) APK.mimeType else spreadsheetMimeType(path)
+
         fun spreadsheetMimeType(path: String): String? =
             spreadsheetTypes[path.substringAfterLast('/').substringAfterLast('.', "").lowercase(Locale.ROOT)]
 
         fun fromMimeType(mimeType: String): DefaultAppFeature? {
             val mime = mimeType.substringBefore(';').trim().lowercase(Locale.ROOT)
             return when {
+                mime == APK.mimeType -> APK
                 mime in spreadsheetTypes.values || mime == "application/csv" -> SPREADSHEET
                 mime.startsWith("text/") || mime == "application/json" || mime == "application/xml" -> TEXT
                 mime.startsWith("image/") -> IMAGE
