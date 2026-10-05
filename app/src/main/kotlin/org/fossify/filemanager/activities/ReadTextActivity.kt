@@ -29,6 +29,7 @@ import org.fossify.filemanager.views.GestureEditText
 import java.io.File
 import java.io.IOException
 import org.fossify.filemanager.helpers.writeEditedText
+import org.fossify.filemanager.helpers.TextEditorState
 import java.io.OutputStream
 
 class ReadTextActivity : SimpleActivity() {
@@ -36,12 +37,17 @@ class ReadTextActivity : SimpleActivity() {
         private const val SELECT_SAVE_FILE_INTENT = 1
         private const val SELECT_SAVE_FILE_AND_EXIT_INTENT = 2
         private const val KEY_UNSAVED_TEXT = "KEY_UNSAVED_TEXT"
+        private const val KEY_PENDING_SAVE_URI = "pending_save_uri"
+        private const val KEY_PENDING_SAVE_EXIT = "pending_save_exit"
     }
 
     private val binding by viewBinding(ActivityReadTextBinding::inflate)
 
     private var filePath = ""
-    private var originalText = ""
+    private val document = TextEditorState()
+    private var pendingDraft: String? = null
+    private var pendingSaveUri: Uri? = null
+    private var pendingSaveExit = false
     private var sourceUri: Uri? = null
     private var isSaving = false
     private var searchIndex = 0
@@ -57,6 +63,10 @@ class ReadTextActivity : SimpleActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
+        pendingDraft = savedInstanceState?.getString(KEY_UNSAVED_TEXT)
+        pendingSaveUri = savedInstanceState?.getString(KEY_PENDING_SAVE_URI)?.let { Uri.parse(it) }
+        pendingSaveExit = savedInstanceState?.getBoolean(KEY_PENDING_SAVE_EXIT) == true
+        binding.readTextView.isEnabled = false
         setupOptionsMenu()
         binding.apply {
             setupEdgeToEdge(padBottomImeAndSystem = listOf(readTextView))
@@ -91,7 +101,7 @@ class ReadTextActivity : SimpleActivity() {
 
         binding.readTextView.onGlobalLayout {
             ensureBackgroundThread {
-                checkIntent(uri, savedInstanceState)
+                checkIntent(uri)
             }
         }
 
@@ -107,8 +117,13 @@ class ReadTextActivity : SimpleActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        if (originalText != binding.readTextView.text.toString()) {
-            outState.putString(KEY_UNSAVED_TEXT, binding.readTextView.text.toString())
+        pendingSaveUri?.let { outState.putString(KEY_PENDING_SAVE_URI, it.toString()) }
+        outState.putBoolean(KEY_PENDING_SAVE_EXIT, pendingSaveExit)
+        val text = binding.readTextView.text.toString()
+        if (!document.isReady) {
+            pendingDraft?.let { outState.putString(KEY_UNSAVED_TEXT, it) }
+        } else if (document.hasChanges(text)) {
+            outState.putString(KEY_UNSAVED_TEXT, text)
         }
     }
 
@@ -116,8 +131,16 @@ class ReadTextActivity : SimpleActivity() {
         super.onActivityResult(requestCode, resultCode, resultData)
         if (requestCode != SELECT_SAVE_FILE_INTENT && requestCode != SELECT_SAVE_FILE_AND_EXIT_INTENT) return
         if (resultCode != Activity.RESULT_OK) return
-        val destination = resultData?.data ?: return
-        val shouldExit = requestCode == SELECT_SAVE_FILE_AND_EXIT_INTENT
+        pendingSaveUri = resultData?.data ?: return
+        pendingSaveExit = requestCode == SELECT_SAVE_FILE_AND_EXIT_INTENT
+        completePendingSave()
+    }
+
+    private fun completePendingSave() {
+        if (!document.isReady) return
+        val destination = pendingSaveUri ?: return
+        val shouldExit = pendingSaveExit
+        pendingSaveUri = null
         // Compare the returned destination, not the original intent's URI.
         val overwritesOriginal = destination == sourceUri ||
             (filePath.isNotEmpty() && getRealPathFromURI(destination) == filePath)
@@ -125,8 +148,8 @@ class ReadTextActivity : SimpleActivity() {
     }
 
     override fun onBackPressedCompat(): Boolean {
-        if (isSaving) return true
-        val hasUnsavedChanges = originalText != binding.readTextView.text.toString()
+        if (isSaving || (!document.isReady && pendingDraft != null)) return true
+        val hasUnsavedChanges = document.hasChanges(binding.readTextView.text.toString())
         return when {
             isSearchActive -> {
                 closeSearch()
@@ -156,7 +179,7 @@ class ReadTextActivity : SimpleActivity() {
 
     private fun setupOptionsMenu() {
         binding.readTextToolbar.setOnMenuItemClickListener { menuItem ->
-            if (isSaving) return@setOnMenuItemClickListener true
+            if (isSaving || !document.isReady) return@setOnMenuItemClickListener true
             when (menuItem.itemId) {
                 R.id.menu_search -> openSearch()
                 R.id.menu_save -> saveText()
@@ -223,6 +246,11 @@ class ReadTextActivity : SimpleActivity() {
     }
 
     private fun saveText(shouldExitAfterSaving: Boolean = false) {
+        if (!document.isReady) return
+        if (!document.canOverwriteOriginal) {
+            saveAsText(shouldExitAfterSaving)
+            return
+        }
         val uri = sourceUri
         if (uri?.scheme == "content") {
             // A content URI is the authoritative location; cloud/SAF documents need no filesystem path.
@@ -272,7 +300,7 @@ class ReadTextActivity : SimpleActivity() {
                     if (failure is SecurityException) onAccessDenied?.invoke()
                 } else {
                     toast(R.string.file_saved)
-                    if (shouldOverwriteOriginalText) originalText = currentText
+                    if (shouldOverwriteOriginalText) document.saved(currentText)
                     // Edits made while saving remain dirty and must not be lost on exit.
                     if (shouldExitAfterSaving && binding.readTextView.text.toString() == currentText) {
                         hideKeyboard()
@@ -324,48 +352,53 @@ class ReadTextActivity : SimpleActivity() {
         }
     }
 
-    private fun checkIntent(uri: Uri, savedInstanceState: Bundle?) {
-        originalText = if (uri.scheme == "file") {
-            filePath = uri.path!!
-            val file = File(filePath)
-            if (file.exists()) {
-                try {
-                    file.readText()
-                } catch (e: Exception) {
-                    showErrorToast(e)
-                    ""
-                }
+    private fun checkIntent(uri: Uri) {
+        try {
+            val text = if (uri.scheme == "file") {
+                File(requireNotNull(uri.path)).readText()
             } else {
-                toast(R.string.unknown_error_occurred)
-                ""
+                val input = contentResolver.openInputStream(uri) ?: throw IOException("Cannot open document")
+                input.bufferedReader().use { it.readText() }
             }
-        } else {
-            try {
-                contentResolver.openInputStream(uri)!!.bufferedReader().use { it.readText() }
-            } catch (e: OutOfMemoryError) {
-                showErrorToast(e.toString())
-                return
-            } catch (e: Exception) {
-                showErrorToast(e)
-                finish()
-                return
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (uri.scheme == "file") filePath = uri.path.orEmpty()
+                document.loaded(text)
+                displayLoadedText(pendingDraft ?: text)
             }
+        } catch (error: OutOfMemoryError) {
+            onDocumentReadFailed(error.toString())
+        } catch (error: IOException) {
+            onDocumentReadFailed(error.toString())
+        } catch (error: SecurityException) {
+            onDocumentReadFailed(error.toString())
+        } catch (error: IllegalArgumentException) {
+            onDocumentReadFailed(error.toString())
         }
+    }
 
+    private fun onDocumentReadFailed(message: String) {
         runOnUiThread {
-            var textToSet = originalText
-
-            if (savedInstanceState != null) {
-                textToSet = savedInstanceState.getString(KEY_UNSAVED_TEXT, originalText)
-            }
-
-            binding.readTextView.setText(textToSet)
-            if (originalText.isNotEmpty()) {
-                hideKeyboard()
+            if (isFinishing || isDestroyed) return@runOnUiThread
+            showErrorToast(message)
+            val draft = pendingDraft
+            if (draft == null) {
+                finish()
             } else {
-                showKeyboard(binding.readTextView)
+                // Preserve restored edits even if the original was removed or its grant expired.
+                document.recoverDraft()
+                displayLoadedText(draft)
             }
         }
+    }
+
+    private fun displayLoadedText(text: String) {
+        pendingDraft = null
+        binding.readTextView.setText(text)
+        binding.readTextView.isEnabled = true
+        if (text.isNotEmpty()) hideKeyboard() else showKeyboard(binding.readTextView)
+        // A picker result can arrive before the document is restored after activity recreation.
+        completePendingSave()
     }
 
     private fun setupSearchButtons() {
