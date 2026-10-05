@@ -38,7 +38,7 @@ class DefaultAppLauncher(private val activity: Activity) {
             if (path.startsWith("content://")) {
                 activity.getMimeTypeFromUri(path.toUri())
             } else {
-                DefaultAppFeature.spreadsheetMimeType(path) ?: path.getMimeType()
+                DefaultAppFeature.fileMimeType(path) ?: path.getMimeType()
             }
         }
         val feature = DefaultAppFeature.fromMimeType(mime)

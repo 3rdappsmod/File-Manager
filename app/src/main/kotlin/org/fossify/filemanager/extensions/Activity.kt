@@ -4,14 +4,10 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.Intent
 import androidx.core.net.toUri
-import androidx.core.content.FileProvider
-import java.io.File
 import java.util.UUID
 import org.fossify.commons.activities.BaseSimpleActivity
 import org.fossify.commons.extensions.getFilenameFromPath
-import org.fossify.commons.extensions.getMimeTypeFromUri
 import org.fossify.commons.extensions.getParentPath
-import org.fossify.commons.extensions.launchActivityIntent
 import org.fossify.commons.extensions.renameFile
 import org.fossify.commons.extensions.setAsIntent
 import org.fossify.commons.extensions.sharePathsIntent
@@ -29,21 +25,8 @@ fun Activity.sharePaths(paths: ArrayList<String>) {
 }
 
 fun Activity.tryOpenPathIntent(path: String, forceChooser: Boolean, openAsType: Int = OPEN_AS_DEFAULT, finishActivity: Boolean = false) {
-    if (!forceChooser && path.endsWith(".apk", true)) {
-        val uri = FileProvider.getUriForFile(
-            this, "${BuildConfig.APPLICATION_ID}.provider", File(path)
-        )
-
-        Intent().apply {
-            action = Intent.ACTION_VIEW
-            setDataAndType(uri, getMimeTypeFromUri(uri))
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            launchActivityIntent(this)
-        }
-    } else {
-        openPath(path, forceChooser, openAsType) {
-            if (finishActivity) finish()
-        }
+    openPath(path, forceChooser, openAsType) {
+        if (finishActivity) finish()
     }
 }
 

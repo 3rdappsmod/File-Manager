@@ -96,4 +96,5 @@
     <string name="feature_default_no_apps">No apps can open this file.</string>
     <string name="feature_default_open_failed">Cannot access this file.</string>
     <string name="feature_default_spreadsheet">Excel and spreadsheets</string>
+    <string name="feature_default_apk">App installation (APK)</string>
 </resources>
