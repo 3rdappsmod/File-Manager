@@ -97,4 +97,11 @@
     <string name="feature_default_open_failed">이 파일에 접근할 수 없습니다.</string>
     <string name="feature_default_spreadsheet">엑셀·스프레드시트</string>
     <string name="feature_default_apk">앱 설치 (APK)</string>
+    <string name="feature_default_word">워드 문서</string>
+    <string name="feature_default_hangul">한글 문서 (HWP·HWPX)</string>
+    <string name="feature_default_presentation">프레젠테이션</string>
+    <string name="feature_default_web">웹 문서 보기</string>
+    <string name="feature_default_markdown">Markdown 편집</string>
+    <string name="feature_default_csv">CSV·TSV 편집</string>
+    <string name="feature_default_ebook">전자책</string>
 </resources>

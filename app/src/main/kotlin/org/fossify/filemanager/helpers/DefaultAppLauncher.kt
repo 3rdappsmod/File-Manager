@@ -7,6 +7,7 @@ import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.fossify.commons.extensions.ensurePublicUri
 import org.fossify.commons.extensions.getMimeType
+import org.fossify.commons.extensions.getFilenameFromUri
 import org.fossify.commons.extensions.getMimeTypeFromUri
 import org.fossify.commons.extensions.openPathIntent
 import org.fossify.commons.extensions.showErrorToast
@@ -36,7 +37,9 @@ class DefaultAppLauncher(private val activity: Activity) {
     private fun prepare(path: String, forcedMime: String, forceChooser: Boolean, onOpened: () -> Unit) {
         val mime = forcedMime.ifEmpty {
             if (path.startsWith("content://")) {
-                activity.getMimeTypeFromUri(path.toUri())
+                DocumentMimeTypes.resolveMimeType(
+                    activity.getMimeTypeFromUri(path.toUri()), activity.getFilenameFromUri(path.toUri())
+                )
             } else {
                 DefaultAppFeature.fileMimeType(path) ?: path.getMimeType()
             }
@@ -58,7 +61,9 @@ class DefaultAppLauncher(private val activity: Activity) {
             return
         }
         val targetMime = if (DefaultAppFeature.fromMimeType(mime) == feature) mime else feature.mimeType
-        val targets = DefaultAppTargets(activity).find(feature, uri, targetMime)
+        val targets = DefaultAppTargets(activity).find(
+            feature, uri, targetMime, DocumentWriteAccess(activity).canGrant(uri, path)
+        )
         attachOriginalPath(targets, path)
         activity.runOnUiThread {
             if (!activity.isFinishing && !activity.isDestroyed) {

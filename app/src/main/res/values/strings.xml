@@ -97,4 +97,11 @@
     <string name="feature_default_open_failed">Cannot access this file.</string>
     <string name="feature_default_spreadsheet">Excel and spreadsheets</string>
     <string name="feature_default_apk">App installation (APK)</string>
+    <string name="feature_default_word">Word documents</string>
+    <string name="feature_default_hangul">Hangul documents (HWP, HWPX)</string>
+    <string name="feature_default_presentation">Presentations</string>
+    <string name="feature_default_web">View web documents</string>
+    <string name="feature_default_markdown">Edit Markdown</string>
+    <string name="feature_default_csv">Edit CSV and TSV</string>
+    <string name="feature_default_ebook">E-books</string>
 </resources>
