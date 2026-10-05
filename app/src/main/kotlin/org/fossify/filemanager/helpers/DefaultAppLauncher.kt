@@ -85,7 +85,8 @@ class DefaultAppLauncher(private val activity: Activity) {
         forceChooser: Boolean,
         onOpened: () -> Unit
     ) {
-        val preferred = targets.find { it.id == activity.config.defaultApps.get(feature) }
+        val saved = activity.config.defaultApps.get(feature)
+        val preferred = targets.find { DefaultAppChoice.matches(saved, it.id) }
         if (!forceChooser && preferred != null && launch(preferred, path)) {
             onOpened()
         } else {
