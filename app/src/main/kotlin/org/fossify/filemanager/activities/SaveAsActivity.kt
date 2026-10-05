@@ -38,7 +38,11 @@ class SaveAsActivity : SimpleActivity() {
         if (intent.action == Intent.ACTION_SEND && intent.extras?.containsKey(Intent.EXTRA_STREAM) == true) {
             FilePickerDialog(this, pickFile = false, showHidden = config.shouldShowHidden(), showFAB = true, showFavoritesButton = true) {
                 val destination = it
-                handleSAFDialog(destination) {
+                handleSAFDialog(destination) { granted ->
+                    if (!granted) {
+                        finish()
+                        return@handleSAFDialog
+                    }
                     toast(R.string.saving)
                     ensureBackgroundThread {
                         try {
