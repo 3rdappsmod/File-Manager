@@ -14,6 +14,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.net.toUri
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.fossify.commons.extensions.*
@@ -25,11 +26,11 @@ import org.fossify.filemanager.R
 import org.fossify.filemanager.databinding.ActivityReadTextBinding
 import org.fossify.filemanager.dialogs.SaveAsDialog
 import org.fossify.filemanager.extensions.openPath
-import org.fossify.filemanager.views.GestureEditText
 import java.io.File
 import java.io.IOException
 import org.fossify.filemanager.helpers.writeEditedText
 import org.fossify.filemanager.helpers.TextEditorState
+import org.fossify.filemanager.helpers.EditorSearch
 import java.io.OutputStream
 
 class ReadTextActivity : SimpleActivity() {
@@ -50,9 +51,8 @@ class ReadTextActivity : SimpleActivity() {
     private var pendingSaveExit = false
     private var sourceUri: Uri? = null
     private var isSaving = false
-    private var searchIndex = 0
+    private val editorSearch = EditorSearch()
     private var savePrompt: AlertDialog? = null
-    private var searchMatches = emptyList<Int>()
     private var isSearchActive = false
 
     private lateinit var searchQueryET: MyEditText
@@ -64,7 +64,7 @@ class ReadTextActivity : SimpleActivity() {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
         pendingDraft = savedInstanceState?.getString(KEY_UNSAVED_TEXT)
-        pendingSaveUri = savedInstanceState?.getString(KEY_PENDING_SAVE_URI)?.let { Uri.parse(it) }
+        pendingSaveUri = savedInstanceState?.getString(KEY_PENDING_SAVE_URI)?.toUri()
         pendingSaveExit = savedInstanceState?.getBoolean(KEY_PENDING_SAVE_EXIT) == true
         binding.readTextView.isEnabled = false
         setupOptionsMenu()
@@ -438,39 +438,19 @@ class ReadTextActivity : SimpleActivity() {
         binding.readTextView.text?.clearBackgroundSpans()
 
         if (text.isNotBlank() && text.length > 1) {
-            searchMatches = binding.readTextView.text.toString().searchMatches(text)
             binding.readTextView.highlightText(text, getProperPrimaryColor())
         }
 
-        if (searchMatches.isNotEmpty()) {
-            binding.readTextView.requestFocus()
-            binding.readTextView.setSelection(searchMatches.getOrNull(searchIndex) ?: 0)
-        }
+        selectSearchMatch()
 
         searchQueryET.postDelayed({
             searchQueryET.requestFocus()
         }, 50)
     }
 
-    private fun goToPrevSearchResult() {
-        if (searchIndex > 0) {
-            searchIndex--
-        } else {
-            searchIndex = searchMatches.lastIndex
-        }
+    private fun goToPrevSearchResult() = selectSearchMatch(-1)
 
-        selectSearchMatch(binding.readTextView)
-    }
-
-    private fun goToNextSearchResult() {
-        if (searchIndex < searchMatches.lastIndex) {
-            searchIndex++
-        } else {
-            searchIndex = 0
-        }
-
-        selectSearchMatch(binding.readTextView)
-    }
+    private fun goToNextSearchResult() = selectSearchMatch(1)
 
     private fun closeSearch() {
         searchQueryET.text?.clear()
@@ -479,12 +459,12 @@ class ReadTextActivity : SimpleActivity() {
         hideKeyboard()
     }
 
-    private fun selectSearchMatch(editText: GestureEditText) {
-        if (searchMatches.isNotEmpty()) {
+    private fun selectSearchMatch(direction: Int = 0) {
+        val editText = binding.readTextView
+        val position = editorSearch.select(editText.text.toString(), searchQueryET.text.toString(), direction)
+        if (position != null) {
             editText.requestFocus()
-            editText.setSelection(searchMatches.getOrNull(searchIndex) ?: 0)
-        } else {
-            hideKeyboard()
+            editText.setSelection(position)
         }
     }
 }
