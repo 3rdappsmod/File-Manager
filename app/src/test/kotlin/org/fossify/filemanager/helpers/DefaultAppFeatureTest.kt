@@ -50,15 +50,15 @@ class DefaultAppFeatureTest {
         }
     }
     @Test
-    fun spreadsheetFormatsUseTheirOwnDefaultIncludingCsvAndTsv() {
-        val extensions = listOf("xls", "xlsx", "xlsm", "xlsb", "xlt", "xltx", "xltm", "ods", "ots", "csv", "tsv")
+    fun spreadsheetFormatsUseTheirOwnDefault() {
+        val extensions = listOf("xls", "xlsx", "xlsm", "xlsb", "xlt", "xltx", "xltm", "ods", "ots")
         extensions.forEach { extension ->
             val mime = requireNotNull(DefaultAppFeature.spreadsheetMimeType("/storage/Report.$extension"))
             assertEquals(DefaultAppFeature.SPREADSHEET, DefaultAppFeature.fromMimeType(mime))
             org.junit.Assert.assertTrue(mime in DefaultAppFeature.SPREADSHEET.discoveryMimeTypes)
         }
-        assertEquals(DefaultAppFeature.SPREADSHEET, DefaultAppFeature.fromMimeType(" Text/CSV; charset=UTF-8 "))
-        assertEquals(DefaultAppFeature.SPREADSHEET, DefaultAppFeature.fromMimeType("application/csv"))
+        assertEquals(DefaultAppFeature.CSV, DefaultAppFeature.fromMimeType(" Text/CSV; charset=UTF-8 "))
+        assertEquals(DefaultAppFeature.CSV, DefaultAppFeature.fromMimeType("application/csv"))
         assertEquals(DefaultAppFeature.TEXT, DefaultAppFeature.fromMimeType("text/*"))
         assertEquals(DefaultAppFeature.TEXT, DefaultAppFeature.fromMimeType("text/plain"))
     }
@@ -76,7 +76,7 @@ class DefaultAppFeatureTest {
     fun apkUsesAnIndependentDefaultAndCaseInsensitiveExtension() {
         assertEquals(DefaultAppFeature.APK, DefaultAppFeature.fromMimeType("application/vnd.android.package-archive"))
         assertEquals(DefaultAppFeature.APK.mimeType, DefaultAppFeature.fileMimeType("/storage/App.APK"))
-        assertNull(DefaultAppFeature.fileMimeType("/storage/App.apk.txt"))
+        assertEquals("text/plain", DefaultAppFeature.fileMimeType("/storage/App.apk.txt"))
         assertEquals(DefaultAppFeature.TEXT, DefaultAppFeature.fromMimeType("text/*"))
         assertNull(DefaultAppFeature.fromMimeType("*/*"))
     }
@@ -91,7 +91,7 @@ class DefaultAppFeatureTest {
     @Test
     fun recognizedAliasesAreAlsoIncludedInSettingsDiscovery() {
         val aliases = mapOf(
-            "application/csv" to DefaultAppFeature.SPREADSHEET,
+            "application/csv" to DefaultAppFeature.CSV,
             "application/ogg" to DefaultAppFeature.AUDIO,
             "application/x-ogg" to DefaultAppFeature.AUDIO,
             "application/flac" to DefaultAppFeature.AUDIO

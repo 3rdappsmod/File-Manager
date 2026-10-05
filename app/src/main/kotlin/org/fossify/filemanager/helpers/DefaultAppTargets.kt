@@ -14,9 +14,14 @@ internal data class DefaultAppTarget(val id: String, val label: String, val inte
 
 internal class DefaultAppTargets(private val activity: Activity) {
     @Suppress("DEPRECATION")
-    fun find(feature: DefaultAppFeature, uri: Uri, mimeType: String): List<DefaultAppTarget> {
+    fun find(
+        feature: DefaultAppFeature,
+        uri: Uri,
+        mimeType: String,
+        canWrite: Boolean = false
+    ): List<DefaultAppTarget> {
         val manager = activity.packageManager
-        val actions = if (feature == DefaultAppFeature.TEXT) {
+        val actions = if (feature.editsDocuments) {
             listOf(Intent.ACTION_EDIT, Intent.ACTION_VIEW)
         } else {
             listOf(Intent.ACTION_VIEW)
@@ -36,7 +41,9 @@ internal class DefaultAppTargets(private val activity: Activity) {
                         clipData = ClipData.newRawUri("", uri)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         if (info.packageName != activity.packageName) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        if (action == Intent.ACTION_EDIT) addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                        if (feature.editsDocuments && canWrite) {
+                            addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                        }
                     }
                     DefaultAppTarget(
                         "$action|${component.flattenToString()}", label(info), target

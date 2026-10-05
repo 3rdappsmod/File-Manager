@@ -8,16 +8,29 @@ enum class DefaultAppFeature(val key: String, val title: Int, val mimeType: Stri
     IMAGE("image", R.string.feature_default_image, "image/*"),
     PDF("pdf", R.string.feature_default_pdf, "application/pdf"),
     SPREADSHEET("spreadsheet", R.string.feature_default_spreadsheet, "application/vnd.ms-excel"),
+    WORD(
+        "word", R.string.feature_default_word,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ),
+    HANGUL("hangul", R.string.feature_default_hangul, "application/x-hwp"),
+    PRESENTATION("presentation", R.string.feature_default_presentation, "application/vnd.ms-powerpoint"),
+    WEB("web", R.string.feature_default_web, "text/html"),
+    MARKDOWN("markdown", R.string.feature_default_markdown, "text/markdown"),
+    CSV("csv", R.string.feature_default_csv, "text/csv"),
+    EBOOK("ebook", R.string.feature_default_ebook, "application/epub+zip"),
     APK("apk", R.string.feature_default_apk, "application/vnd.android.package-archive"),
     AUDIO("audio", R.string.feature_default_audio, "audio/*"),
     VIDEO("video", R.string.feature_default_video, "video/*");
 
     val discoveryMimeTypes: List<String>
         get() = when (this) {
-            SPREADSHEET -> (spreadsheetTypes.values + "application/csv").distinct()
+            SPREADSHEET -> spreadsheetTypes.values.distinct()
             AUDIO -> listOf(mimeType) + audioAliases
-            else -> listOf(mimeType)
+            else -> (listOf(mimeType) + DocumentMimeTypes.forFeature(this)).distinct()
         }
+
+    // These functions are editors even when the receiving app exposes only ACTION_VIEW.
+    val editsDocuments get() = this == TEXT || this == MARKDOWN || this == CSV
 
     val preferenceKey get() = "feature_default_app_$key"
 
@@ -35,13 +48,12 @@ enum class DefaultAppFeature(val key: String, val title: Int, val mimeType: Stri
             "xlsb" to "application/vnd.ms-excel.sheet.binary.macroenabled.12",
             "xltm" to "application/vnd.ms-excel.template.macroenabled.12",
             "ods" to "application/vnd.oasis.opendocument.spreadsheet",
-            "ots" to "application/vnd.oasis.opendocument.spreadsheet-template",
-            "csv" to "text/csv",
-            "tsv" to "text/tab-separated-values"
+            "ots" to "application/vnd.oasis.opendocument.spreadsheet-template"
         )
 
         fun fileMimeType(path: String): String? =
-            if (path.endsWith(".apk", ignoreCase = true)) APK.mimeType else spreadsheetMimeType(path)
+            if (path.endsWith(".apk", ignoreCase = true)) APK.mimeType
+            else spreadsheetMimeType(path) ?: DocumentMimeTypes.fromFilename(path)
 
         fun spreadsheetMimeType(path: String): String? =
             spreadsheetTypes[path.substringAfterLast('/').substringAfterLast('.', "").lowercase(Locale.ROOT)]
@@ -51,9 +63,9 @@ enum class DefaultAppFeature(val key: String, val title: Int, val mimeType: Stri
 
         fun fromMimeType(mimeType: String): DefaultAppFeature? {
             val mime = normalizeMimeType(mimeType)
-            return when {
+            return DocumentMimeTypes.featureFor(mime) ?: when {
                 mime == APK.mimeType -> APK
-                mime in spreadsheetTypes.values || mime == "application/csv" -> SPREADSHEET
+                mime in spreadsheetTypes.values -> SPREADSHEET
                 mime.startsWith("text/") || mime == "application/json" || mime == "application/xml" -> TEXT
                 mime.startsWith("image/") -> IMAGE
                 mime == "application/pdf" -> PDF
