@@ -14,11 +14,11 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ImageView
 import android.widget.TextView
-import org.fossify.commons.dialogs.ConfirmationAdvancedDialog
+import androidx.appcompat.app.AlertDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.fossify.commons.extensions.*
 import org.fossify.commons.helpers.NavigationIcon
 import org.fossify.commons.helpers.REAL_FILE_PATH
-import org.fossify.commons.helpers.SAVE_DISCARD_PROMPT_INTERVAL
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.views.MyEditText
 import org.fossify.filemanager.R
@@ -41,7 +41,7 @@ class ReadTextActivity : SimpleActivity() {
     private var filePath = ""
     private var originalText = ""
     private var searchIndex = 0
-    private var lastSavePromptTS = 0L
+    private var savePrompt: AlertDialog? = null
     private var searchMatches = emptyList<Int>()
     private var isSearchActive = false
 
@@ -96,6 +96,8 @@ class ReadTextActivity : SimpleActivity() {
     override fun onResume() {
         super.onResume()
         setupTopAppBar(binding.readTextAppbar, NavigationIcon.Arrow)
+        // Commons installs a finish() listener; route the toolbar through the same guard as system Back.
+        binding.readTextToolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -126,20 +128,26 @@ class ReadTextActivity : SimpleActivity() {
                 closeSearch()
                 true
             }
-            hasUnsavedChanges && System.currentTimeMillis() - lastSavePromptTS > SAVE_DISCARD_PROMPT_INTERVAL -> {
-                lastSavePromptTS = System.currentTimeMillis()
-                ConfirmationAdvancedDialog(this, "", R.string.save_before_closing, R.string.save, R.string.discard) {
-                    if (it) {
-                        saveText(true)
-                    } else {
-                        performDefaultBack()
-                    }
-                }
+            hasUnsavedChanges -> {
+                showSavePrompt()
                 true
             }
 
             else -> false
         }
+    }
+
+    private fun showSavePrompt() {
+        if (savePrompt?.isShowing == true) return
+        savePrompt = MaterialAlertDialogBuilder(this)
+            .setMessage(R.string.save_before_closing)
+            .setPositiveButton(R.string.save) { _, _ -> saveText(true) }
+            .setNegativeButton(R.string.discard) { _, _ -> performDefaultBack() }
+            .setNeutralButton(R.string.cancel, null)
+            .create().also { dialog ->
+                dialog.setOnDismissListener { savePrompt = null }
+                dialog.show()
+            }
     }
 
     private fun setupOptionsMenu() {
