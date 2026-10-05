@@ -13,12 +13,18 @@ enum class DefaultAppFeature(val key: String, val title: Int, val mimeType: Stri
     VIDEO("video", R.string.feature_default_video, "video/*");
 
     val discoveryMimeTypes: List<String>
-        get() = if (this == SPREADSHEET) spreadsheetTypes.values.distinct() else listOf(mimeType)
+        get() = when (this) {
+            SPREADSHEET -> (spreadsheetTypes.values + "application/csv").distinct()
+            AUDIO -> listOf(mimeType) + audioAliases
+            else -> listOf(mimeType)
+        }
 
     val preferenceKey get() = "feature_default_app_$key"
 
     companion object {
         const val BUILT_IN_AUDIO = "builtin:audio"
+
+        private val audioAliases = listOf("application/ogg", "application/x-ogg", "application/flac")
 
         private val spreadsheetTypes = mapOf(
             "xls" to "application/vnd.ms-excel",
@@ -40,15 +46,18 @@ enum class DefaultAppFeature(val key: String, val title: Int, val mimeType: Stri
         fun spreadsheetMimeType(path: String): String? =
             spreadsheetTypes[path.substringAfterLast('/').substringAfterLast('.', "").lowercase(Locale.ROOT)]
 
+        fun normalizeMimeType(mimeType: String): String =
+            mimeType.substringBefore(';').trim().lowercase(Locale.ROOT)
+
         fun fromMimeType(mimeType: String): DefaultAppFeature? {
-            val mime = mimeType.substringBefore(';').trim().lowercase(Locale.ROOT)
+            val mime = normalizeMimeType(mimeType)
             return when {
                 mime == APK.mimeType -> APK
                 mime in spreadsheetTypes.values || mime == "application/csv" -> SPREADSHEET
                 mime.startsWith("text/") || mime == "application/json" || mime == "application/xml" -> TEXT
                 mime.startsWith("image/") -> IMAGE
                 mime == "application/pdf" -> PDF
-                mime.startsWith("audio/") -> AUDIO
+                mime.startsWith("audio/") || mime in audioAliases -> AUDIO
                 mime.startsWith("video/") -> VIDEO
                 else -> null
             }

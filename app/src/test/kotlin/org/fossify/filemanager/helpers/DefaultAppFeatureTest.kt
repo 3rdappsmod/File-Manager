@@ -80,4 +80,25 @@ class DefaultAppFeatureTest {
         assertEquals(DefaultAppFeature.TEXT, DefaultAppFeature.fromMimeType("text/*"))
         assertNull(DefaultAppFeature.fromMimeType("*/*"))
     }
+    @Test
+    fun handlerQueriesReceiveTheSameNormalizedMimeUsedForClassification() {
+        val incoming = " Application/Vnd.Android.Package-Archive; charset=UTF-8 "
+        assertEquals(DefaultAppFeature.APK.mimeType, DefaultAppFeature.normalizeMimeType(incoming))
+        assertEquals("text/csv", DefaultAppFeature.normalizeMimeType(" Text/CSV; charset=UTF-8 "))
+        assertEquals("image/*", DefaultAppFeature.normalizeMimeType("IMAGE/*"))
+    }
+
+    @Test
+    fun recognizedAliasesAreAlsoIncludedInSettingsDiscovery() {
+        val aliases = mapOf(
+            "application/csv" to DefaultAppFeature.SPREADSHEET,
+            "application/ogg" to DefaultAppFeature.AUDIO,
+            "application/x-ogg" to DefaultAppFeature.AUDIO,
+            "application/flac" to DefaultAppFeature.AUDIO
+        )
+        aliases.forEach { (mime, feature) ->
+            assertEquals(feature, DefaultAppFeature.fromMimeType(mime))
+            org.junit.Assert.assertTrue(mime in feature.discoveryMimeTypes)
+        }
+    }
 }

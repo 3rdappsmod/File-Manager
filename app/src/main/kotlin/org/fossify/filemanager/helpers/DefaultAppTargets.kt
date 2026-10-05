@@ -22,7 +22,7 @@ internal class DefaultAppTargets(private val activity: Activity) {
             listOf(Intent.ACTION_VIEW)
         }
         val targets = actions.flatMap { action ->
-            val intent = Intent(action).setDataAndType(uri, mimeType)
+            val intent = Intent(action).setDataAndType(uri, DefaultAppFeature.normalizeMimeType(mimeType))
             manager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY).mapNotNull { resolved ->
                 val info = resolved.activityInfo
                 val permitted = info.permission == null ||
