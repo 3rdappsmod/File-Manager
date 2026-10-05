@@ -104,4 +104,5 @@
     <string name="feature_default_markdown">Edit Markdown</string>
     <string name="feature_default_csv">Edit CSV and TSV</string>
     <string name="feature_default_ebook">E-books</string>
+    <string name="storage_permission_settings_unavailable">Cannot open storage access settings. Check storage permissions in your device settings.</string>
 </resources>
