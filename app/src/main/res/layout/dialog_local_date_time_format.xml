@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="@dimen/activity_margin"
+    android:paddingEnd="@dimen/activity_margin">
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/use_24_hour"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/use_24_hour_time_format" />
+</LinearLayout>
