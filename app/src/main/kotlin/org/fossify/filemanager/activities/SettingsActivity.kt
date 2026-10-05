@@ -2,7 +2,7 @@ package org.fossify.filemanager.activities
 
 import android.content.Intent
 import android.os.Bundle
-import org.fossify.commons.dialogs.ChangeDateTimeFormatDialog
+import org.fossify.filemanager.dialogs.LocalDateTimeFormatDialog
 import org.fossify.commons.dialogs.ConfirmationDialog
 import org.fossify.commons.dialogs.RadioGroupDialog
 import org.fossify.commons.dialogs.SecurityDialog
@@ -109,7 +109,7 @@ class SettingsActivity : SimpleActivity() {
 
     private fun setupChangeDateTimeFormat() {
         binding.settingsChangeDateTimeFormatHolder.setOnClickListener {
-            ChangeDateTimeFormatDialog(this) {}
+            LocalDateTimeFormatDialog(this)
         }
     }
 
