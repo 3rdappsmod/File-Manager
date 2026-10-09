@@ -11,6 +11,7 @@ androidx-media = "1.7.0"
 #Fossify
 commons = "7.1.2"
 #Other
+junit = "4.13.2"
 autofittextview = "0.2.1"
 gestureviews = "2.9.0"
 rootshell = "bc7e5d398e"
@@ -34,6 +35,7 @@ compose-detekt = { module = "io.nlopez.compose.rules:detekt", version.ref = "det
 #Fossify
 fossify-commons = { module = "org.fossify:commons", version.ref = "commons" }
 #Other
+junit = { module = "junit:junit", version.ref = "junit" }
 autofittextview = { module = "me.grantland:autofittextview", version.ref = "autofittextview" }
 gestureviews = { module = "com.alexvasilkov:gesture-views", version.ref = "gestureviews" }
 rootshell = { module = "com.github.naveensingh:RootShell", version.ref = "rootshell" }
