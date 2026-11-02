@@ -3,6 +3,8 @@ package org.fossify.filemanager.extensions
 import android.app.Activity
 import android.content.Intent
 import androidx.core.content.FileProvider
+import java.io.File
+import java.util.UUID
 import org.fossify.commons.activities.BaseSimpleActivity
 import org.fossify.commons.extensions.getFilenameFromPath
 import org.fossify.commons.extensions.getMimeTypeFromUri
@@ -13,12 +15,12 @@ import org.fossify.commons.extensions.renameFile
 import org.fossify.commons.extensions.setAsIntent
 import org.fossify.commons.extensions.sharePathsIntent
 import org.fossify.filemanager.BuildConfig
+import org.fossify.filemanager.activities.MusicPlayerActivity
 import org.fossify.filemanager.helpers.OPEN_AS_AUDIO
 import org.fossify.filemanager.helpers.OPEN_AS_DEFAULT
 import org.fossify.filemanager.helpers.OPEN_AS_IMAGE
 import org.fossify.filemanager.helpers.OPEN_AS_TEXT
 import org.fossify.filemanager.helpers.OPEN_AS_VIDEO
-import java.io.File
 
 fun Activity.sharePaths(paths: ArrayList<String>) {
     sharePathsIntent(paths, BuildConfig.APPLICATION_ID)
@@ -60,6 +62,15 @@ private fun getMimeType(type: Int) = when (type) {
 
 fun Activity.setAs(path: String) {
     setAsIntent(path, BuildConfig.APPLICATION_ID)
+}
+
+fun Activity.openAudioInBuiltInPlayer(path: String) {
+    Intent(this, MusicPlayerActivity::class.java).apply {
+        putExtra(MusicPlayerActivity.EXTRA_PATH, path)
+        putExtra(MusicPlayerActivity.EXTRA_REQUEST_ID, UUID.randomUUID().toString())
+        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        startActivity(this)
+    }
 }
 
 fun BaseSimpleActivity.toggleItemVisibility(oldPath: String, hide: Boolean, callback: ((newPath: String) -> Unit)? = null) {

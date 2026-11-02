@@ -2,10 +2,11 @@ package org.fossify.filemanager.helpers
 
 import android.content.Context
 import android.content.res.Configuration
-import org.fossify.commons.extensions.getInternalStoragePath
-import org.fossify.commons.helpers.BaseConfig
+import androidx.core.content.edit
 import java.io.File
 import java.util.Locale
+import org.fossify.commons.extensions.getInternalStoragePath
+import org.fossify.commons.helpers.BaseConfig
 
 class Config(context: Context) : BaseConfig(context) {
     companion object {
@@ -121,4 +122,12 @@ class Config(context: Context) : BaseConfig(context) {
     var wasStorageAnalysisTabAdded: Boolean
         get() = prefs.getBoolean(WAS_STORAGE_ANALYSIS_TAB_ADDED, false)
         set(wasStorageAnalysisTabAdded) = prefs.edit().putBoolean(WAS_STORAGE_ANALYSIS_TAB_ADDED, wasStorageAnalysisTabAdded).apply()
+
+    var musicPlayerEngine: Int
+        get() = prefs.getInt(MUSIC_PLAYER_ENGINE, MUSIC_PLAYER_ENGINE_SYSTEM)
+        set(musicPlayerEngine) = prefs.edit { putInt(MUSIC_PLAYER_ENGINE, musicPlayerEngine) }
+
+    var musicPlayerRepeatMode: Int
+        get() = prefs.getInt(MUSIC_PLAYER_REPEAT_MODE, MUSIC_PLAYER_REPEAT_MODE_ONCE)
+        set(musicPlayerRepeatMode) = prefs.edit { putInt(MUSIC_PLAYER_REPEAT_MODE, musicPlayerRepeatMode) }
 }

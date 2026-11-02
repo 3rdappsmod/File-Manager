@@ -11,6 +11,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.viewpager.widget.ViewPager
 import com.stericson.RootTools.RootTools
+import java.io.File
 import me.grantland.widget.AutofitHelper
 import org.fossify.commons.dialogs.RadioGroupDialog
 import org.fossify.commons.extensions.appLaunched
@@ -24,10 +25,8 @@ import org.fossify.commons.extensions.getMimeType
 import org.fossify.commons.extensions.getProperBackgroundColor
 import org.fossify.commons.extensions.getProperTextColor
 import org.fossify.commons.extensions.getRealPathFromURI
-import org.fossify.commons.extensions.getStorageDirectories
 import org.fossify.commons.extensions.getTimeFormat
 import org.fossify.commons.extensions.handleHiddenFolderPasswordProtection
-import org.fossify.commons.extensions.hasOTGConnected
 import org.fossify.commons.extensions.hasPermission
 import org.fossify.commons.extensions.hideKeyboard
 import org.fossify.commons.extensions.humanizePath
@@ -71,8 +70,9 @@ import org.fossify.filemanager.fragments.RecentsFragment
 import org.fossify.filemanager.fragments.StorageFragment
 import org.fossify.filemanager.helpers.MAX_COLUMN_COUNT
 import org.fossify.filemanager.helpers.RootHelpers
+import org.fossify.filemanager.helpers.UsbStorageMonitor
+import org.fossify.filemanager.helpers.isWithinStorage
 import org.fossify.filemanager.interfaces.ItemOperationsListener
-import java.io.File
 
 class MainActivity : SimpleActivity() {
     override var isSearchBarEnabled = true
@@ -91,6 +91,14 @@ class MainActivity : SimpleActivity() {
     private var mStoredDateFormat = ""
     private var mStoredTimeFormat = ""
     private var mStoredShowTabs = 0
+
+    private val usbStorage by lazy {
+        UsbStorageMonitor(this, { path ->
+            if (getCurrentFragment()?.currentPath?.isWithinStorage(path) == true) {
+                openPath(internalStoragePath, forceRefresh = true)
+            }
+        }, { getAllFragments().forEach { it?.refreshFragment() } })
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -111,6 +119,7 @@ class MainActivity : SimpleActivity() {
         setupTabs()
 
         setupEdgeToEdge(padBottomImeAndSystem = listOf(binding.mainTabsHolder))
+        usbStorage.start()
 
         if (savedInstanceState == null) {
             config.temporarilyShowHidden = false
@@ -159,6 +168,11 @@ class MainActivity : SimpleActivity() {
         super.onPause()
         storeStateVariables()
         config.lastUsedViewPagerPage = binding.mainViewPager.currentItem
+    }
+
+    override fun onDestroy() {
+        usbStorage.close()
+        super.onDestroy()
     }
 
     override fun onBackPressedCompat(): Boolean {
@@ -446,14 +460,7 @@ class MainActivity : SimpleActivity() {
     }
 
     private fun checkOTGPath() {
-        ensureBackgroundThread {
-            if (!config.wasOTGHandled && hasPermission(PERMISSION_WRITE_STORAGE) && hasOTGConnected() && config.OTGPath.isEmpty()) {
-                getStorageDirectories().firstOrNull { it.trimEnd('/') != internalStoragePath && it.trimEnd('/') != sdCardPath }?.apply {
-                    config.wasOTGHandled = true
-                    config.OTGPath = trimEnd('/')
-                }
-            }
-        }
+        if (hasStoragePermission()) usbStorage.refreshPath()
     }
 
     private fun openPath(path: String, forceRefresh: Boolean = false) {

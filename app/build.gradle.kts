@@ -136,13 +136,20 @@ detekt {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     implementation(libs.fossify.commons)
     implementation(libs.androidx.documentfile)
     implementation(libs.androidx.swiperefreshlayout)
+    implementation(libs.androidx.media)
     implementation(libs.roottools)
     implementation(libs.rootshell)
     implementation(libs.gestureviews)
     implementation(libs.autofittextview)
     implementation(libs.zip4j)
     detektPlugins(libs.compose.detekt)
+}
+
+// Analyze the application's bytecode target, independently of the JVM running Gradle.
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    jvmTarget = libs.versions.app.build.kotlinJVMTarget.get()
 }

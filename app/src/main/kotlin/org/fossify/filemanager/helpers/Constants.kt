@@ -22,6 +22,17 @@ const val FILE_LANDSCAPE_COLUMN_CNT = "file_landscape_column_cnt"
 const val DISPLAY_FILE_NAMES = "display_file_names"
 const val SHOW_TABS = "show_tabs"
 const val WAS_STORAGE_ANALYSIS_TAB_ADDED = "was_storage_analysis_tab_added"
+const val MUSIC_PLAYER_ENGINE = "music_player_engine"
+const val MUSIC_PLAYER_REPEAT_MODE = "music_player_repeat_mode"
+
+// music player engine
+const val MUSIC_PLAYER_ENGINE_SYSTEM = 0
+const val MUSIC_PLAYER_ENGINE_BUILT_IN = 1
+
+// music player repeat mode
+const val MUSIC_PLAYER_REPEAT_MODE_ONCE = 0
+const val MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE = 1
+const val MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL = 2
 
 // open as
 const val OPEN_AS_DEFAULT = 0
@@ -46,6 +57,9 @@ const val PRIMARY_VOLUME_NAME = "external_primary"
 
 // what else should we count as an audio except "audio/*" mimetype
 val extraAudioMimeTypes = arrayListOf("application/ogg")
+
+// Supplement Commons audioExtensions; recognizing an extension does not guarantee codec support.
+val extraPlayableAudioExtensions = setOf("oga", "wave", "amr", "awb")
 val extraDocumentMimeTypes = arrayListOf(
     "application/pdf",
     "application/msword",
