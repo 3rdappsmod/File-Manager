@@ -2,13 +2,13 @@ package org.fossify.filemanager.activities
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.ActivityNotFoundException
 import android.os.Environment
 import android.provider.Settings
 import org.fossify.commons.activities.BaseSimpleActivity
 import org.fossify.commons.dialogs.ConfirmationAdvancedDialog
 import org.fossify.commons.extensions.hasPermission
 import android.net.Uri
-import org.fossify.commons.extensions.showErrorToast
 import org.fossify.commons.extensions.toast
 import org.fossify.commons.helpers.PERMISSION_WRITE_STORAGE
 import org.fossify.commons.helpers.isRPlus
@@ -50,7 +50,9 @@ open class SimpleActivity : BaseSimpleActivity() {
         super.onActivityResult(requestCode, resultCode, resultData)
         isAskingPermissions = false
         if (requestCode == MANAGE_STORAGE_RC && isRPlus()) {
-            actionOnPermission?.invoke(Environment.isExternalStorageManager())
+            val callback = actionOnPermission
+            actionOnPermission = null
+            callback?.invoke(Environment.isExternalStorageManager())
         }
     }
 
@@ -75,19 +77,11 @@ open class SimpleActivity : BaseSimpleActivity() {
                     if (success) {
                         isAskingPermissions = true
                         actionOnPermission = callback
-                        try {
-                            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                            intent.addCategory("android.intent.category.DEFAULT")
-                            intent.data = Uri.parse("package:$packageName")
-                            startActivityForResult(intent, MANAGE_STORAGE_RC)
-                        } catch (e: android.content.ActivityNotFoundException) {
-                            showErrorToast(e)
-                            val intent = Intent()
-                            intent.action = Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
-                            startActivityForResult(intent, MANAGE_STORAGE_RC)
-                        } catch (e: SecurityException) {
-                            showErrorToast(e)
-                            finish()
+                        if (!openStoragePermissionSettings()) {
+                            isAskingPermissions = false
+                            actionOnPermission = null
+                            toast(R.string.storage_permission_settings_unavailable)
+                            callback(false)
                         }
                     } else {
                         finish()
@@ -98,4 +92,27 @@ open class SimpleActivity : BaseSimpleActivity() {
             }
         }
     }
+
+    // Called only from the Android 11+ branch of handleStoragePermission.
+    @SuppressLint("InlinedApi")
+    @Suppress("DEPRECATION")
+    private fun openStoragePermissionSettings(): Boolean {
+        val screens = listOf(
+            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                data = Uri.parse("package:$packageName")
+            },
+            Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+        )
+        return screens.any { intent ->
+            try {
+                startActivityForResult(intent, MANAGE_STORAGE_RC)
+                true
+            } catch (_: ActivityNotFoundException) {
+                false
+            } catch (_: SecurityException) {
+                false
+            }
+        }
+    }
+
 }
