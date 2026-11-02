@@ -21,6 +21,7 @@ import org.fossify.filemanager.databinding.ItemsFragmentBinding
 import org.fossify.filemanager.dialogs.CreateNewItemDialog
 import org.fossify.filemanager.extensions.config
 import org.fossify.filemanager.extensions.isPathOnRoot
+import org.fossify.filemanager.helpers.DirectoryObserver
 import org.fossify.filemanager.helpers.MAX_COLUMN_COUNT
 import org.fossify.filemanager.helpers.RootHelpers
 import org.fossify.filemanager.interfaces.ItemOperationsListener
@@ -38,6 +39,13 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
     private var storedItems = ArrayList<ListItem>()
     private var itemsIgnoringSearch = ArrayList<ListItem>()
     private lateinit var binding: ItemsFragmentBinding
+
+    private var directoryObserver: DirectoryObserver? = null
+    private var observedPath = ""
+    private var directoryViewVisible = false
+    private var directoryRefreshPending = false
+    private var directoryLoadGeneration = 0
+    private var directoryLoadInProgress = false
 
     override fun onFinishInflate() {
         super.onFinishInflate()
@@ -99,7 +107,7 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
         getRecyclerAdapter()?.finishActMode()
     }
 
-    fun openPath(path: String, forceRefresh: Boolean = false) {
+    fun openPath(path: String, forceRefresh: Boolean = false, fromDirectoryObserver: Boolean = false) {
         if ((activity as? BaseSimpleActivity)?.isAskingPermissions == true) {
             return
         }
@@ -112,7 +120,10 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
         scrollStates[currentPath] = getScrollState()!!
         currentPath = realPath
         showHidden = context!!.config.shouldShowHidden()
+        watchDirectory(realPath)
         showProgressBar()
+        directoryLoadInProgress = true
+        val loadGeneration = ++directoryLoadGeneration
         getItems(currentPath) { originalPath, listItems ->
             if (currentPath != originalPath) {
                 return@getItems
@@ -131,16 +142,93 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
                 }
             }
 
-            itemsIgnoringSearch = listItems
             activity?.runOnUiThread {
+                if (!isCurrentDirectoryLoad(originalPath, loadGeneration)) {
+                    return@runOnUiThread
+                }
+                directoryLoadInProgress = false
+                if (shouldDeferDirectoryLoad(fromDirectoryObserver)) {
+                    directoryRefreshPending = true
+                    hideProgressBar()
+                    return@runOnUiThread
+                }
+                itemsIgnoringSearch = listItems
                 (activity as? MainActivity)?.refreshMenuItems()
                 addItems(listItems, forceRefresh)
                 if (context != null && currentViewType != context!!.config.getFolderViewType(currentPath)) {
                     setupLayoutManager()
                 }
                 hideProgressBar()
+                refreshDirectoryIfReady()
             }
         }
+    }
+
+    private fun watchDirectory(path: String) {
+        if (!directoryViewVisible || observedPath == path) {
+            return
+        }
+
+        directoryObserver?.close()
+        observedPath = path
+        directoryRefreshPending = false
+        directoryObserver = DirectoryObserver(path) {
+            directoryRefreshPending = true
+            refreshDirectoryIfReady()
+        }.apply { start() }
+    }
+
+    private fun isCurrentDirectoryLoad(path: String, generation: Int): Boolean {
+        return currentPath == path && generation == directoryLoadGeneration && isAttachedToWindow
+    }
+
+    private fun shouldDeferDirectoryLoad(fromDirectoryObserver: Boolean): Boolean {
+        val blocked = !directoryViewVisible || getRecyclerAdapter()?.isSelectionActive == true
+        return lastSearchedText.isNotEmpty() || (fromDirectoryObserver && blocked)
+    }
+
+    private fun refreshDirectoryIfReady() {
+        if (!directoryRefreshPending || directoryLoadInProgress || !isAttachedToWindow) return
+        if (shouldDeferDirectoryLoad(fromDirectoryObserver = true)) return
+        directoryRefreshPending = false
+        openPath(currentPath, fromDirectoryObserver = true)
+    }
+
+    override fun selectionModeEnded() {
+        // Let the old action mode finish cleaning up before a refresh replaces its adapter.
+        post { refreshDirectoryIfReady() }
+    }
+
+    override fun onVisibilityAggregated(isVisible: Boolean) {
+        super.onVisibilityAggregated(isVisible)
+        directoryViewVisible = isVisible
+        if (isVisible && currentPath.isNotEmpty()) {
+            watchDirectory(currentPath)
+            // Include changes made while the window was hidden, also for SAF paths.
+            directoryRefreshPending = true
+            refreshDirectoryIfReady()
+        } else if (!isVisible) {
+            directoryObserver?.close()
+            directoryObserver = null
+            observedPath = ""
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (currentPath.isNotEmpty()) {
+            watchDirectory(currentPath)
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        directoryViewVisible = false
+        directoryLoadGeneration++
+        directoryLoadInProgress = false
+        directoryObserver?.close()
+        directoryObserver = null
+        observedPath = ""
+        super.onDetachedFromWindow()
     }
 
     private fun addItems(items: ArrayList<ListItem>, forceRefresh: Boolean = false) {
@@ -224,7 +312,7 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
         val lastModifieds = context!!.getFolderLastModifieds(path)
 
         for (file in files) {
-            val listItem = getListItemFromFile(file, isSortingBySize, lastModifieds, false)
+            val listItem = getListItemFromFile(file, isSortingBySize, lastModifieds, getProperChildCount)
             if (listItem != null) {
                 if (wantedMimeTypes.any { isProperMimeType(it, file.absolutePath, file.isDirectory) }) {
                     items.add(listItem)
@@ -232,21 +320,9 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
             }
         }
 
-        // send out the initial item list asap, get proper child count asynchronously as it can be slow
+        // Publish a complete snapshot, including zero counts. Deferred updates used to mutate
+        // an adapter belonging to a newer load and leave the ListItem hash out of sync.
         callback(path, items)
-
-        if (getProperChildCount) {
-            items.filter { it.mIsDirectory }.forEach {
-                if (context != null) {
-                    val childrenCount = it.getDirectChildrenCount(activity as BaseSimpleActivity, showHidden)
-                    if (childrenCount != 0) {
-                        activity?.runOnUiThread {
-                            getRecyclerAdapter()?.updateChildCount(it.mPath, childrenCount)
-                        }
-                    }
-                }
-            }
-        }
     }
 
     private fun getListItemFromFile(file: File, isSortingBySize: Boolean, lastModifieds: HashMap<String, Long>, getProperChildCount: Boolean): ListItem? {
@@ -314,6 +390,7 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
                 text.isEmpty() -> {
                     itemsFastscroller.beVisible()
                     getRecyclerAdapter()?.updateItems(itemsIgnoringSearch)
+                    refreshDirectoryIfReady()
                     itemsPlaceholder.beGone()
                     itemsPlaceholder2.beGone()
                     hideProgressBar()

@@ -13,6 +13,7 @@ import android.provider.MediaStore
 import android.provider.Settings
 import android.util.AttributeSet
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
 import androidx.core.view.children
 import androidx.core.view.isVisible
@@ -149,12 +150,12 @@ class StorageFragment(
         context.updateTextColors(binding.root)
 
         val properPrimaryColor = context.getProperPrimaryColor()
-        val redColor = context.resources.getColor(R.color.md_red_700)
-        val greenColor = context.resources.getColor(R.color.md_green_700)
-        val lightBlueColor = context.resources.getColor(R.color.md_light_blue_700)
-        val yellowColor = context.resources.getColor(R.color.md_yellow_700)
-        val tealColor = context.resources.getColor(R.color.md_teal_700)
-        val pinkColor = context.resources.getColor(R.color.md_pink_700)
+        val redColor = ContextCompat.getColor(context, R.color.md_red_700)
+        val greenColor = ContextCompat.getColor(context, R.color.md_green_700)
+        val lightBlueColor = ContextCompat.getColor(context, R.color.md_light_blue_700)
+        val yellowColor = ContextCompat.getColor(context, R.color.md_yellow_700)
+        val tealColor = ContextCompat.getColor(context, R.color.md_teal_700)
+        val pinkColor = ContextCompat.getColor(context, R.color.md_pink_700)
 
         volumes.values.forEach { volumeBinding ->
             volumeBinding.apply {

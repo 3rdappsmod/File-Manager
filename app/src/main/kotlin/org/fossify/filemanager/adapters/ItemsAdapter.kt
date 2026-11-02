@@ -114,7 +114,9 @@ import org.fossify.filemanager.helpers.RootHelpers
 import org.fossify.filemanager.interfaces.ItemOperationsListener
 import org.fossify.filemanager.models.ListItem
 import java.io.BufferedInputStream
-import java.io.Closeable
+import org.fossify.filemanager.helpers.resolveArchiveEntry
+import org.fossify.filemanager.helpers.listFilesForArchive
+import java.io.IOException
 import java.io.File
 import java.util.LinkedList
 import java.util.Locale
@@ -130,6 +132,9 @@ class ItemsAdapter(
     itemClick: (Any) -> Unit,
 ) : MyRecyclerViewAdapter(activity, recyclerView, itemClick),
     RecyclerViewFastScroller.OnPopupTextUpdate {
+
+    var isSelectionActive = false
+        private set
 
     private lateinit var fileDrawable: Drawable
     private lateinit var folderDrawable: Drawable
@@ -228,12 +233,15 @@ class ItemsAdapter(
     }
 
     override fun onActionModeCreated() {
+        isSelectionActive = true
         swipeRefreshLayout?.isRefreshing = false
         swipeRefreshLayout?.isEnabled = false
     }
 
     override fun onActionModeDestroyed() {
+        isSelectionActive = false
         swipeRefreshLayout?.isEnabled = config.enablePullToRefresh
+        listener?.selectionModeEnded()
     }
 
     override fun getItemViewType(position: Int): Int {
@@ -373,7 +381,7 @@ class ItemsAdapter(
         val manager = activity.getSystemService(ShortcutManager::class.java)
         if (manager.isRequestPinShortcutSupported) {
             val path = getFirstSelectedItemPath()
-            val drawable = resources.getDrawable(R.drawable.shortcut_folder).mutate()
+            val drawable = resources.getDrawable(R.drawable.shortcut_folder, activity.theme).mutate()
             getShortcutImage(path, drawable) {
                 val intent = Intent(activity, SplashActivity::class.java)
                 intent.action = Intent.ACTION_VIEW
@@ -415,7 +423,7 @@ class ItemsAdapter(
                     .load(getImagePathToLoad(path))
                     .apply(options)
                     .centerCrop()
-                    .into(size, size)
+                    .submit(size, size)
 
                 try {
                     val bitmap = builder.get()
@@ -676,11 +684,10 @@ class ItemsAdapter(
                     val fileDirItems = ArrayList<FileDirItem>()
                     var entry = zipInputStream.nextEntry
                     while (entry != null) {
-                        val currPath = if (entry.isDirectory) {
-                            path
-                        } else {
-                            "${path.getParentPath().trimEnd('/')}/${entry.fileName}"
-                        }
+                        val destination = resolveArchiveEntry(
+                            File(path.getParentPath()), path.getFilenameFromPath().dropLast(4)
+                        )
+                        val currPath = resolveArchiveEntry(destination, entry.fileName).path
                         val fileDirItem = FileDirItem(
                             path = currPath,
                             name = entry.fileName,
@@ -691,11 +698,11 @@ class ItemsAdapter(
                         fileDirItems.add(fileDirItem)
                         entry = zipInputStream.nextEntry
                     }
-                    val destinationPath = fileDirItems.first().getParentPath().trimEnd('/')
+                    val destinationPath = File(path.getParentPath(), path.getFilenameFromPath().dropLast(4)).path
                     activity.runOnUiThread {
                         activity.checkConflicts(fileDirItems, destinationPath, 0, LinkedHashMap()) {
                             ensureBackgroundThread {
-                                decompressPaths(sourcePaths, it, callback)
+                                decompressPaths(listOf(path), it, callback)
                             }
                         }
                     }
@@ -729,7 +736,8 @@ class ItemsAdapter(
                     val newFolderName = zipFileName.subSequence(0, zipFileName.length - 4)
                     while (entry != null) {
                         val parentPath = path.getParentPath()
-                        val newPath = "$parentPath/$newFolderName/${entry.fileName.trimEnd('/')}"
+                        val destination = resolveArchiveEntry(File(parentPath), newFolderName.toString())
+                        val newPath = resolveArchiveEntry(destination, entry.fileName).path
 
                         val resolution = getConflictResolution(conflictResolutions, newPath)
                         val doesPathExist = activity.getDoesFilePathExist(newPath)
@@ -784,16 +792,15 @@ class ItemsAdapter(
             if (!activity.createDirectorySync(newPath) && !activity.getDoesFilePathExist(newPath)) {
                 val error =
                     String.format(activity.getString(R.string.could_not_create_file), newPath)
-                activity.showErrorToast(error)
+                throw IOException(error)
             } else {
                 foldersTimestamp.add(Pair(File(newPath), entry))
             }
         } else {
             val fos = activity.getFileOutputStreamSync(newPath, newPath.getMimeType())
-            if (fos != null) {
-                zipInputStream.copyTo(fos)
-                File(newPath).setLastModified(entry)
-            }
+                ?: throw IOException("Cannot open destination: $newPath")
+            fos.use { zipInputStream.copyTo(it) }
+            File(newPath).setLastModified(entry)
         }
     }
 
@@ -810,6 +817,11 @@ class ItemsAdapter(
         }
     }
 
+    private fun copyFileToArchive(path: String, output: ZipOutputStream) {
+        val input = activity.getFileInputStreamSync(path) ?: throw IOException("Cannot open source: $path")
+        input.use { it.copyTo(output) }
+    }
+
     @SuppressLint("NewApi")
     private fun compressPaths(
         sourcePaths: List<String>,
@@ -818,10 +830,6 @@ class ItemsAdapter(
     ): Boolean {
         val queue = LinkedList<String>()
         val fos = activity.getFileOutputStreamSync(targetPath, "application/zip") ?: return false
-
-        val zout =
-            password?.let { ZipOutputStream(fos, password.toCharArray()) } ?: ZipOutputStream(fos)
-        var res: Closeable = fos
 
         fun zipEntry(name: String, lastModified: Long) = ZipParameters().also {
             it.fileNameInZip = name
@@ -833,76 +841,78 @@ class ItemsAdapter(
         }
 
         try {
-            sourcePaths.forEach { currentPath ->
-                var name: String
-                var mainFilePath = currentPath
-                val base = "${mainFilePath.getParentPath()}/"
-                res = zout
-                queue.push(mainFilePath)
-                if (activity.getIsPathDirectory(mainFilePath)) {
-                    name = "${mainFilePath.getFilenameFromPath()}/"
-                    val dirModified = File(mainFilePath).lastModified()
-                    zout.putNextEntry(
-                        ZipParameters().also {
-                            it.fileNameInZip = name
-                            it.lastModifiedFileTime = dirModified
+            fos.use { output ->
+                val zip = password?.let { ZipOutputStream(output, it.toCharArray()) } ?: ZipOutputStream(output)
+                zip.use { zout ->
+                    sourcePaths.forEach { currentPath ->
+                        var name: String
+                        var mainFilePath = currentPath
+                        val base = "${mainFilePath.getParentPath()}/"
+                        queue.push(mainFilePath)
+                        if (activity.getIsPathDirectory(mainFilePath)) {
+                            name = "${mainFilePath.getFilenameFromPath()}/"
+                            val dirModified = File(mainFilePath).lastModified()
+                            zout.putNextEntry(
+                                ZipParameters().also {
+                                    it.fileNameInZip = name
+                                    it.lastModifiedFileTime = dirModified
+                                }
+                            )
                         }
-                    )
-                }
 
-                while (!queue.isEmpty()) {
-                    mainFilePath = queue.pop()
-                    if (activity.getIsPathDirectory(mainFilePath)) {
-                        if (activity.isRestrictedSAFOnlyRoot(mainFilePath)) {
-                            activity.getAndroidSAFFileItems(mainFilePath, true) { files ->
-                                for (file in files) {
-                                    name = file.path.relativizeWith(base)
-                                    if (activity.getIsPathDirectory(file.path)) {
-                                        queue.push(file.path)
-                                        name = "${name.trimEnd('/')}/"
-                                        zout.putNextEntry(zipEntry(name, file.modified))
-                                    } else {
-                                        zout.putNextEntry(zipEntry(name, file.modified))
-                                        activity.getFileInputStreamSync(file.path)!!.copyTo(zout)
-                                        zout.closeEntry()
+                        while (!queue.isEmpty()) {
+                            mainFilePath = queue.pop()
+                            if (activity.getIsPathDirectory(mainFilePath)) {
+                                if (activity.isRestrictedSAFOnlyRoot(mainFilePath)) {
+                                    activity.getAndroidSAFFileItems(mainFilePath, true) { files ->
+                                        for (file in files) {
+                                            name = file.path.relativizeWith(base)
+                                            if (activity.getIsPathDirectory(file.path)) {
+                                                queue.push(file.path)
+                                                name = "${name.trimEnd('/')}/"
+                                                zout.putNextEntry(zipEntry(name, file.modified))
+                                            } else {
+                                                zout.putNextEntry(zipEntry(name, file.modified))
+                                                copyFileToArchive(file.path, zout)
+                                                zout.closeEntry()
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    val mainFile = File(mainFilePath)
+                                    for (file in listFilesForArchive(mainFile)) {
+                                        name = file.path.relativizeWith(base)
+                                        if (activity.getIsPathDirectory(file.absolutePath)) {
+                                            queue.push(file.absolutePath)
+                                            name = "${name.trimEnd('/')}/"
+                                            zout.putNextEntry(zipEntry(name, file.lastModified()))
+                                        } else {
+                                            zout.putNextEntry(zipEntry(name, file.lastModified()))
+                                            copyFileToArchive(file.path, zout)
+                                            zout.closeEntry()
+                                        }
                                     }
                                 }
-                            }
-                        } else {
-                            val mainFile = File(mainFilePath)
-                            for (file in mainFile.listFiles()) {
-                                name = file.path.relativizeWith(base)
-                                if (activity.getIsPathDirectory(file.absolutePath)) {
-                                    queue.push(file.absolutePath)
-                                    name = "${name.trimEnd('/')}/"
-                                    zout.putNextEntry(zipEntry(name, file.lastModified()))
-                                } else {
-                                    zout.putNextEntry(zipEntry(name, file.lastModified()))
-                                    activity.getFileInputStreamSync(file.path)!!.copyTo(zout)
-                                    zout.closeEntry()
-                                }
+
+                            } else {
+                                name =
+                                    if (base == currentPath) {
+                                        currentPath.getFilenameFromPath()
+                                    } else {
+                                        mainFilePath.relativizeWith(base)
+                                    }
+                                val fileModified = File(mainFilePath).lastModified()
+                                zout.putNextEntry(zipEntry(name, fileModified))
+                                copyFileToArchive(mainFilePath, zout)
+                                zout.closeEntry()
                             }
                         }
-
-                    } else {
-                        name =
-                            if (base == currentPath) {
-                                currentPath.getFilenameFromPath()
-                            } else {
-                                mainFilePath.relativizeWith(base)
-                            }
-                        val fileModified = File(mainFilePath).lastModified()
-                        zout.putNextEntry(zipEntry(name, fileModified))
-                        activity.getFileInputStreamSync(mainFilePath)!!.copyTo(zout)
-                        zout.closeEntry()
                     }
                 }
             }
         } catch (exception: Exception) {
             activity.showErrorToast(exception)
             return false
-        } finally {
-            res.close()
         }
         return true
     }
@@ -966,12 +976,14 @@ class ItemsAdapter(
 
     private fun getFirstSelectedItemPath() = getSelectedFileDirItems().first().path
 
+    @Suppress("UNCHECKED_CAST")
     private fun getSelectedFileDirItems(): ArrayList<FileDirItem> {
         return listItems.filter {
             selectedKeys.contains(it.path.hashCode())
         } as ArrayList<FileDirItem>
     }
 
+    @Suppress("UNCHECKED_CAST")
     fun updateItems(newItems: ArrayList<ListItem>, highlightText: String = "") {
         if (newItems.hashCode() != currentItemsHash) {
             currentItemsHash = newItems.hashCode()
@@ -1149,7 +1161,7 @@ class ItemsAdapter(
         folderDrawable =
             resources.getColoredDrawableWithColor(R.drawable.ic_folder_vector, properPrimaryColor)
         folderDrawable.alpha = 180
-        fileDrawable = resources.getDrawable(R.drawable.ic_file_generic)
+        fileDrawable = resources.getDrawable(R.drawable.ic_file_generic, activity.theme)
         fileDrawables = getFilePlaceholderDrawables(activity)
     }
 

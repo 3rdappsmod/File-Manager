@@ -3,6 +3,7 @@ package org.fossify.filemanager.activities
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import androidx.core.content.IntentCompat
 import org.fossify.commons.dialogs.FilePickerDialog
 import org.fossify.commons.extensions.*
 import org.fossify.commons.helpers.NavigationIcon
@@ -10,6 +11,7 @@ import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.filemanager.R
 import org.fossify.filemanager.databinding.ActivitySaveAsBinding
 import org.fossify.filemanager.extensions.config
+import java.io.IOException
 import java.io.File
 
 class SaveAsActivity : SimpleActivity() {
@@ -49,18 +51,21 @@ class SaveAsActivity : SimpleActivity() {
                                 }
                             }
 
-                            val source = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)!!
+                            val source = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)!!
                             val originalFilename = getFilenameFromContentUri(source)
                                 ?: source.toString().getFilenameFromPath()
                             val filename = sanitizeFilename(originalFilename)
                             val mimeType = contentResolver.getType(source)
                                 ?: intent.type?.takeIf { it != "*/*" }
                                 ?: filename.getMimeType()
-                            val inputStream = contentResolver.openInputStream(source)
-
                             val destinationPath = getAvailablePath("$destination/$filename")
-                            val outputStream = getFileOutputStreamSync(destinationPath, mimeType, null)!!
-                            inputStream!!.copyTo(outputStream)
+                            val inputStream = contentResolver.openInputStream(source)
+                                ?: throw IOException("Cannot open source: $source")
+                            inputStream.use { input ->
+                                val outputStream = getFileOutputStreamSync(destinationPath, mimeType, null)
+                                    ?: throw IOException("Cannot open destination: $destinationPath")
+                                outputStream.use { output -> input.copyTo(output) }
+                            }
                             rescanPaths(arrayListOf(destinationPath))
                             toast(R.string.file_saved)
                             finish()
