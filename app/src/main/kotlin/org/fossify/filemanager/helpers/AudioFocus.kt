@@ -7,39 +7,64 @@ import android.content.IntentFilter
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.os.Handler
+import android.os.Looper
 import androidx.core.content.ContextCompat
 
-/** Calls pause for interruptions, including duck requests, to keep speech recordings private. */
-class AudioFocus(private val context: Context, private val pause: () -> Unit) {
+/** Wait for initial focus, but cancel playback on interruptions or headphone disconnection. */
+class AudioFocus(private val context: Context, private val pause: () -> Unit, private val resume: () -> Unit) {
     private val manager = context.getSystemService(AudioManager::class.java)
+    private val handler = Handler(Looper.getMainLooper())
+    private val state = AudioFocusState()
     private var registered = false
-    private val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-        .setAudioAttributes(attributes())
-        .setWillPauseWhenDucked(true)
-        .setOnAudioFocusChangeListener { change ->
-            if (change != AudioManager.AUDIOFOCUS_GAIN) pause()
-        }
-        .build()
+    private var request: AudioFocusRequest? = null
     private val noisyReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) pause()
         }
     }
 
-    fun acquire(): Boolean {
-        if (manager.requestAudioFocus(request) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return false
-        if (!registered) {
+    fun acquire(): AudioFocusState.Result {
+        if (request != null) return state.result
+        val token = state.begin()
+        val nextRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            .setAudioAttributes(attributes())
+            .setWillPauseWhenDucked(true)
+            .setAcceptsDelayedFocusGain(true)
+            .setOnAudioFocusChangeListener({ change ->
+                if (state.isCurrent(token)) {
+                    if (change == AudioManager.AUDIOFOCUS_GAIN) {
+                        if (state.gain(token)) resume()
+                    } else {
+                        pause()
+                    }
+                }
+            }, handler)
+            .build()
+        request = nextRequest
+        val result = when (manager.requestAudioFocus(nextRequest)) {
+            AudioManager.AUDIOFOCUS_REQUEST_GRANTED -> AudioFocusState.Result.GRANTED
+            AudioManager.AUDIOFOCUS_REQUEST_DELAYED -> AudioFocusState.Result.DELAYED
+            else -> AudioFocusState.Result.FAILED
+        }
+        state.complete(token, result)
+        if (result == AudioFocusState.Result.FAILED) {
+            release()
+        } else if (!registered) {
             ContextCompat.registerReceiver(
                 context, noisyReceiver, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),
                 ContextCompat.RECEIVER_NOT_EXPORTED
             )
             registered = true
         }
-        return true
+        return result
     }
 
     fun release() {
-        manager.abandonAudioFocusRequest(request)
+        state.cancel()
+        val previous = request
+        request = null
+        previous?.let { manager.abandonAudioFocusRequest(it) }
         if (registered) {
             context.unregisterReceiver(noisyReceiver)
             registered = false

@@ -123,6 +123,9 @@ class Config(context: Context) : BaseConfig(context) {
         get() = prefs.getBoolean(WAS_STORAGE_ANALYSIS_TAB_ADDED, false)
         set(wasStorageAnalysisTabAdded) = prefs.edit().putBoolean(WAS_STORAGE_ANALYSIS_TAB_ADDED, wasStorageAnalysisTabAdded).apply()
 
+    val defaultApps: DefaultAppPreferences
+        get() = DefaultAppPreferences(prefs, musicPlayerEngine == MUSIC_PLAYER_ENGINE_BUILT_IN)
+
     var musicPlayerEngine: Int
         get() = prefs.getInt(MUSIC_PLAYER_ENGINE, MUSIC_PLAYER_ENGINE_SYSTEM)
         set(musicPlayerEngine) = prefs.edit { putInt(MUSIC_PLAYER_ENGINE, musicPlayerEngine) }

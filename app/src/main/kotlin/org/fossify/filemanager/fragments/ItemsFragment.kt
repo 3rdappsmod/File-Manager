@@ -124,7 +124,15 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
         showProgressBar()
         directoryLoadInProgress = true
         val loadGeneration = ++directoryLoadGeneration
-        getItems(currentPath) { originalPath, listItems ->
+        getItems(currentPath, onPermissionDenied = {
+            activity?.runOnUiThread {
+                if (isCurrentDirectoryLoad(realPath, loadGeneration)) {
+                    directoryLoadInProgress = false
+                    directoryRefreshPending = false
+                    hideProgressBar()
+                }
+            }
+        }) { originalPath, listItems ->
             if (currentPath != originalPath) {
                 return@getItems
             }
@@ -269,7 +277,11 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
     private fun getRecyclerLayoutManager() = (binding.itemsList.layoutManager as MyGridLayoutManager)
 
     @SuppressLint("NewApi")
-    private fun getItems(path: String, callback: (originalPath: String, items: ArrayList<ListItem>) -> Unit) {
+    private fun getItems(
+        path: String,
+        onPermissionDenied: () -> Unit,
+        callback: (originalPath: String, items: ArrayList<ListItem>) -> Unit
+    ) {
         ensureBackgroundThread {
             if (activity?.isDestroyed == false && activity?.isFinishing == false) {
                 val config = context!!.config
@@ -278,6 +290,7 @@ class ItemsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerF
                     activity?.handleAndroidSAFDialog(path, openInSystemAppAllowed = true) {
                         if (!it) {
                             activity?.toast(R.string.no_storage_permissions)
+                            onPermissionDenied()
                             return@handleAndroidSAFDialog
                         }
                         val getProperChildCount = context!!.config.getFolderViewType(currentPath) == VIEW_TYPE_LIST

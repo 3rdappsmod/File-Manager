@@ -15,6 +15,7 @@ import androidx.core.app.ServiceCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import org.fossify.commons.extensions.getFilenameFromPath
 import org.fossify.filemanager.R
+import org.fossify.filemanager.activities.ExternalMusicPlayerActivity
 import org.fossify.filemanager.activities.MusicPlayerActivity
 import org.fossify.filemanager.services.MusicPlayerService
 
@@ -41,7 +42,7 @@ class PlayerNotification(private val service: Service) {
     fun update(path: String, playing: Boolean, token: MediaSession.Token?, preparing: Boolean) {
         // Retain an existing foreground session between tracks; background promotion may be forbidden.
         if (playing || (preparing && foreground)) {
-            manager.notify(NOTIFICATION_ID, build(path, playing, token))
+            manager.notify(NOTIFICATION_ID, build(path, playing || preparing, token))
         } else {
             remove()
         }
@@ -53,7 +54,13 @@ class PlayerNotification(private val service: Service) {
     }
 
     private fun build(path: String, playing: Boolean, token: MediaSession.Token?): Notification {
-        val intent = Intent(service, MusicPlayerActivity::class.java).apply {
+        val activity = if (isExternalAudioUri(path)) {
+            ExternalMusicPlayerActivity::class.java
+        } else {
+            MusicPlayerActivity::class.java
+        }
+        val intent = Intent(service, activity).apply {
+            if (isExternalAudioUri(path)) addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
         val contentIntent = PendingIntent.getActivity(

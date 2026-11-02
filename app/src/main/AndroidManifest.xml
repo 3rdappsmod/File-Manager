@@ -17,6 +17,14 @@
     <queries>
         <package android:name="org.fossify.filemanager.debug" />
         <package android:name="org.fossify.filemanager" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="*/*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.EDIT" />
+            <data android:mimeType="*/*" />
+        </intent>
     </queries>
 
     <application
@@ -28,6 +36,12 @@
         android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/AppTheme">
+
+        <activity
+            android:name=".activities.DefaultAppsActivity"
+            android:exported="false"
+            android:label="@string/feature_default_title"
+            android:parentActivityName=".activities.SettingsActivity" />
 
         <activity
             android:name=".activities.SplashActivity"
@@ -149,11 +163,38 @@
             android:parentActivityName=".activities.MainActivity" />
 
         <activity
+            android:name=".activities.OpenAudioActivity"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:label="@string/music_player">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="application/ogg" />
+                <data android:mimeType="application/x-ogg" />
+                <data android:mimeType="application/flac" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name=".activities.MusicPlayerActivity"
             android:configChanges="orientation"
             android:exported="false"
             android:label="@string/music_player"
             android:parentActivityName=".activities.MainActivity" />
+
+        <activity
+            android:name=".activities.ExternalMusicPlayerActivity"
+            android:configChanges="orientation"
+            android:exported="false"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:label="@string/music_player" />
 
         <service
             android:name=".services.MusicPlayerService"

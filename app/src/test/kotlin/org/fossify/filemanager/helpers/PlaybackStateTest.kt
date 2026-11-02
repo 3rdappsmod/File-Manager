@@ -45,4 +45,28 @@ class PlaybackStateTest {
             assertEquals(PlaybackState.Status.PLAYING, state.status)
         }
     }
+    @Test
+    fun focusDelayRetainsPreparedPlayerAndAutoplayIntent() {
+        val state = PlaybackState()
+        state.prepare()
+        state.ready()
+        state.awaitFocus()
+        assertTrue(state.isPrepared)
+        assertTrue(state.isWaitingToPlay)
+        state.started()
+        assertFalse(state.waitingForFocus)
+        assertEquals(PlaybackState.Status.PLAYING, state.status)
+    }
+
+    @Test
+    fun explicitPauseCancelsDelayedPlayback() {
+        val state = PlaybackState()
+        state.prepare()
+        state.ready()
+        state.awaitFocus()
+        state.pause()
+        assertFalse(state.playWhenReady)
+        assertFalse(state.waitingForFocus)
+        assertTrue(state.isPrepared)
+    }
 }

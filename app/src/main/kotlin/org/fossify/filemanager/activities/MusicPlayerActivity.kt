@@ -1,5 +1,6 @@
 package org.fossify.filemanager.activities
 
+import android.content.ClipData
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -22,6 +23,7 @@ import org.fossify.commons.helpers.NavigationIcon
 import org.fossify.filemanager.R
 import org.fossify.filemanager.databinding.ActivityMusicPlayerBinding
 import org.fossify.filemanager.extensions.config
+import org.fossify.filemanager.helpers.isExternalAudioUri
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_ONCE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_REPEAT_ONE
 import org.fossify.filemanager.helpers.MUSIC_PLAYER_REPEAT_MODE_SEQUENTIAL
@@ -29,7 +31,7 @@ import org.fossify.filemanager.services.MusicPlayerService
 
 // Lifecycle, service and view callbacks are kept together to make subscription ownership explicit.
 @Suppress("TooManyFunctions")
-class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListener {
+open class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListener {
     companion object {
         const val EXTRA_PATH = "extra_path"
         const val EXTRA_REQUEST_ID = "extra_request_id"
@@ -72,6 +74,7 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
         setupEdgeToEdge(padBottomSystem = listOf(binding.musicPlayerHolder))
 
         val serviceIntent = Intent(this, MusicPlayerService::class.java)
+        forwardAudioGrant(serviceIntent)
         startService(serviceIntent)
         isBound = bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
@@ -79,6 +82,9 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        val serviceIntent = Intent(this, MusicPlayerService::class.java)
+        forwardAudioGrant(serviceIntent)
+        startService(serviceIntent)
         startRequestedPlaylist()
     }
 
@@ -159,6 +165,15 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
         }
     }
 
+    private fun forwardAudioGrant(serviceIntent: Intent) {
+        val uri = intent.data ?: return
+        if (!isExternalAudioUri(uri.toString())) return
+        // A service grant survives closing the player activity for background playback/repeat.
+        serviceIntent.data = uri
+        serviceIntent.clipData = ClipData.newRawUri("audio", uri)
+        serviceIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+
     private fun startRequestedPlaylist() {
         val path = intent.getStringExtra(EXTRA_PATH) ?: return
         val requestId = intent.getStringExtra(EXTRA_REQUEST_ID) ?: return
@@ -191,7 +206,8 @@ class MusicPlayerActivity : SimpleActivity(), MusicPlayerService.PlaybackListene
     }
 
     private fun updatePlayPauseIcon(isPlaying: Boolean) {
-        val iconId = if (isPlaying) R.drawable.ic_pause_vector else R.drawable.ic_play_vector
+        val requested = isPlaying || musicService?.isPlayPending() == true
+        val iconId = if (requested) R.drawable.ic_pause_vector else R.drawable.ic_play_vector
         binding.musicPlayerPlayPause.setImageResource(iconId)
     }
 

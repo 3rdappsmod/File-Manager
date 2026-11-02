@@ -2,6 +2,7 @@ package org.fossify.filemanager.helpers
 
 import android.content.Context
 import android.media.MediaPlayer
+import androidx.core.net.toUri
 import org.fossify.commons.extensions.getAndroidSAFFileItems
 import org.fossify.commons.extensions.getAndroidSAFUri
 import org.fossify.commons.extensions.getOTGFastDocumentFile
@@ -18,6 +19,10 @@ class AudioStorage(private val context: Context) {
     fun loadPlaylist(path: String, callback: (Result<List<String>>) -> Unit) {
         ensureBackgroundThread {
             try {
+                if (isExternalAudioUri(path)) {
+                    callback(Result.success(listOf(path)))
+                    return@ensureBackgroundThread
+                }
                 val parent = File(path).parent ?: throw IOException("Audio file has no parent directory")
                 val showHidden = context.config.shouldShowHidden()
                 val complete: (List<String>) -> Unit = { paths ->
@@ -45,7 +50,9 @@ class AudioStorage(private val context: Context) {
     }
 
     fun setDataSource(player: MediaPlayer, path: String) {
-        if (File(path).canRead()) {
+        if (isExternalAudioUri(path)) {
+            player.setDataSource(context, path.toUri())
+        } else if (File(path).canRead()) {
             player.setDataSource(path)
         } else {
             val uri = when {
