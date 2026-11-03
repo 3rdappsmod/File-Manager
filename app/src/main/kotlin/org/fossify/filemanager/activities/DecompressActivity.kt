@@ -28,6 +28,7 @@ import org.fossify.filemanager.databinding.ActivityDecompressBinding
 import org.fossify.filemanager.extensions.config
 import org.fossify.filemanager.extensions.setLastModified
 import org.fossify.filemanager.models.ListItem
+import org.fossify.filemanager.helpers.forEachZipEntry
 import java.io.BufferedInputStream
 import org.fossify.filemanager.helpers.resolveArchiveEntry
 import java.io.IOException
@@ -151,38 +152,23 @@ class DecompressActivity : SimpleActivity() {
 
     private fun decompressTo(destination: String) {
         try {
-            val inputStream = contentResolver.openInputStream(uri!!)
-            val zipInputStream = ZipInputStream(BufferedInputStream(inputStream!!))
-            if (password != null) {
-                zipInputStream.setPassword(password?.toCharArray())
-            }
             val foldersTimestamp = mutableListOf<Pair<File, LocalFileHeader>>()
-
-            zipInputStream.use {
-                while (true) {
-                    val entry = zipInputStream.nextEntry ?: break
-                    val filename = filename.substringBeforeLast(".")
-                    val parent = resolveArchiveEntry(File(destination), filename).path
-                    val outputFile = resolveArchiveEntry(File(parent), entry.fileName)
-                    val newPath = outputFile.path
-
-                    ensureExtractionDirectory(parent)
-
-                    if (entry.isDirectory) {
-                        ensureExtractionDirectory(newPath)
-                        foldersTimestamp.add(Pair(outputFile, entry))
-                        continue
-                    }
-
+            forEachZipEntry({ contentResolver.openInputStream(uri!!) }, password?.toCharArray()) { zip, entry ->
+                val parent = resolveArchiveEntry(File(destination), filename.substringBeforeLast(".")).path
+                val outputFile = resolveArchiveEntry(File(parent), entry.fileName)
+                val newPath = outputFile.path
+                ensureExtractionDirectory(parent)
+                if (entry.isDirectory) {
+                    ensureExtractionDirectory(newPath)
+                    foldersTimestamp.add(Pair(outputFile, entry))
+                } else {
                     val fos = getFileOutputStreamSync(newPath, newPath.getMimeType())
                         ?: throw IOException("Cannot open destination: $newPath")
-                    fos.use { output -> zipInputStream.copyTo(output) }
-                    outputFile.setLastModified(entry)
-                }
-                for ((outputFile, entry) in foldersTimestamp.asReversed()) {
+                    fos.use { output -> zip.copyTo(output) }
                     outputFile.setLastModified(entry)
                 }
             }
+            foldersTimestamp.asReversed().forEach { (folder, header) -> folder.setLastModified(header) }
             toast(R.string.decompression_successful)
             finish()
         } catch (e: Exception) {

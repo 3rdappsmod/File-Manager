@@ -38,6 +38,27 @@ class ZipArchiveTest {
     }
 
     @Test
+    fun passwordIsAppliedBeforeReadingEncryptedEntries() {
+        val password = "test-password".toCharArray()
+        val buffer = ByteArrayOutputStream()
+        net.lingala.zip4j.io.outputstream.ZipOutputStream(buffer, password).use { zip ->
+            val parameters = net.lingala.zip4j.model.ZipParameters().apply {
+                fileNameInZip = "secret.txt"
+                isEncryptFiles = true
+                encryptionMethod = net.lingala.zip4j.model.enums.EncryptionMethod.AES
+            }
+            zip.putNextEntry(parameters)
+            zip.write("secret data".toByteArray())
+            zip.closeEntry()
+        }
+        val texts = mutableListOf<String>()
+        forEachZipEntry({ ByteArrayInputStream(buffer.toByteArray()) }, password) { zip, _ ->
+            texts.add(zip.readBytes().decodeToString())
+        }
+        assertEquals(listOf("secret data"), texts)
+    }
+
+    @Test
     fun missingInputIsReportedAsFailure() {
         assertThrows(IOException::class.java) { forEachZipEntry({ null }) { _, _ -> } }
     }
