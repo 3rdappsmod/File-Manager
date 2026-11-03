@@ -113,7 +113,6 @@
     <string name="app_backup_search">앱 이름 또는 패키지 검색</string>
     <string name="app_backup_user">사용자 앱</string>
     <string name="app_backup_system">시스템 앱</string>
-    <string name="app_backup_select_all">표시된 앱 전체 선택 / 해제</string>
     <string name="app_backup_save">선택한 앱 백업</string>
     <string name="app_backup_save_count">선택한 앱 백업 (%1$d개)</string>
     <string name="app_backup_install">백업 파일 설치</string>

@@ -1,16 +1,22 @@
 package org.fossify.filemanager.activities
 
-import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import androidx.activity.OnBackPressedCallback
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.ViewModelProvider
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import android.content.res.ColorStateList
+import android.view.ViewGroup
+import android.widget.TextView
+import org.fossify.commons.extensions.getProperBackgroundColor
+import org.fossify.commons.extensions.getProperTextColor
+import org.fossify.commons.extensions.getProperPrimaryColor
+import org.fossify.commons.extensions.getContrastColor
+import org.fossify.filemanager.adapters.BackupAppsAdapter
 import org.fossify.commons.extensions.updateTextColors
 import org.fossify.commons.extensions.viewBinding
 import org.fossify.commons.helpers.NavigationIcon
@@ -26,11 +32,6 @@ class AppBackupActivity : SimpleActivity() {
     private val binding by viewBinding(ActivityAppBackupBinding::inflate)
     private val model by lazy { ViewModelProvider(this)[AppBackupModel::class.java] }
     private var shown = emptyList<BackupApp>()
-    private val filePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) startActivity(Intent(this, PackageInstallActivity::class.java).setData(uri)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
@@ -52,14 +53,51 @@ class AppBackupActivity : SimpleActivity() {
 
     override fun onResume() {
         super.onResume()
-        setupTopAppBar(binding.backupAppbar, NavigationIcon.Arrow)
+        setupTopAppBar(binding.backupAppbar, NavigationIcon.Arrow, getProperBackgroundColor())
         binding.backupToolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
+        applyTheme()
+        renderList()
+    }
+
+    private fun applyTheme() {
+        val text = getProperTextColor()
+        val primary = getProperPrimaryColor()
+        binding.root.setBackgroundColor(getProperBackgroundColor())
         updateTextColors(binding.backupContent)
+        binding.backupSearch.setTextColor(text)
+        binding.backupSearch.setHintTextColor(ColorStateList.valueOf(text).withAlpha(HINT_ALPHA))
+        binding.backupSearch.backgroundTintList = ColorStateList.valueOf(primary)
+        binding.backupSave.backgroundTintList = ColorStateList(
+            arrayOf(intArrayOf(android.R.attr.state_enabled), intArrayOf()),
+            intArrayOf(primary, android.graphics.Color.argb(DISABLED_ALPHA,
+                android.graphics.Color.red(primary), android.graphics.Color.green(primary),
+                android.graphics.Color.blue(primary)))
+        )
+        binding.backupSave.setTextColor(ColorStateList(
+            arrayOf(intArrayOf(android.R.attr.state_enabled), intArrayOf()),
+            intArrayOf(primary.getContrastColor(), text)
+        ))
+        binding.backupProgress.indeterminateTintList = ColorStateList.valueOf(primary)
+        for (index in 0 until binding.backupContent.childCount) {
+            val view = binding.backupContent.getChildAt(index)
+            if (view is TextView && view !== binding.backupSave) view.setTextColor(text)
+        }
+    }
+
+    private fun colorCategory(view: View): View = view.apply {
+        (this as? TextView)?.setTextColor(getProperTextColor())
+        setBackgroundColor(getProperBackgroundColor())
     }
 
     private fun setupControls() {
-        binding.backupCategory.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item,
-            listOf(getString(R.string.app_backup_user), getString(R.string.app_backup_system)))
+        binding.backupCategory.adapter = object : ArrayAdapter<String>(this,
+            android.R.layout.simple_spinner_dropdown_item,
+            listOf(getString(R.string.app_backup_user), getString(R.string.app_backup_system))) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
+                colorCategory(super.getView(position, convertView, parent))
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View =
+                colorCategory(super.getDropDownView(position, convertView, parent))
+        }
         binding.backupCategory.setSelection(if (model.system) 1 else 0)
         binding.backupCategory.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onNothingSelected(parent: AdapterView<*>?) = Unit
@@ -79,18 +117,12 @@ class AppBackupActivity : SimpleActivity() {
         binding.backupList.setOnItemClickListener { _, _, position, _ ->
             val name = shown[position].packageName
             if (!model.selected.add(name)) model.selected.remove(name)
+            (binding.backupList.adapter as? BackupAppsAdapter)?.notifyDataSetChanged()
             renderState(model.state.value ?: BackupState())
-        }
-        binding.backupSelectAll.setOnClickListener {
-            val names = shown.map { it.packageName }
-            if (model.selected.containsAll(names)) model.selected.removeAll(names.toSet())
-            else model.selected.addAll(names)
-            renderList()
         }
         binding.backupSave.setOnClickListener {
             handleStoragePermission { granted -> if (granted) model.backup() }
         }
-        binding.backupInstall.setOnClickListener { filePicker.launch(arrayOf("*/*")) }
     }
 
     private fun renderList() {
@@ -98,10 +130,7 @@ class AppBackupActivity : SimpleActivity() {
             it.system == model.system &&
                 (it.label.contains(model.query, true) || it.packageName.contains(model.query, true))
         }
-        binding.backupList.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_multiple_choice, shown)
-        shown.forEachIndexed { index, app ->
-            binding.backupList.setItemChecked(index, app.packageName in model.selected)
-        }
+        binding.backupList.adapter = BackupAppsAdapter(this, shown, model.selected)
         renderState(model.state.value ?: BackupState())
     }
 
@@ -110,7 +139,7 @@ class AppBackupActivity : SimpleActivity() {
         binding.backupSave.text = getString(R.string.app_backup_save_count, model.selected.size)
         binding.backupSave.isEnabled = !state.busy && model.selected.isNotEmpty()
         listOf(binding.backupCategory, binding.backupSearch,
-            binding.backupSelectAll, binding.backupInstall, binding.backupList).forEach { it.isEnabled = !state.busy }
+            binding.backupList).forEach { it.isEnabled = !state.busy }
         binding.backupProgress.visibility = if (state.busy) View.VISIBLE else View.GONE
         if (state.busy) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -127,4 +156,8 @@ class AppBackupActivity : SimpleActivity() {
         }
     }
 
+    companion object {
+        private const val HINT_ALPHA = 170
+        private const val DISABLED_ALPHA = 100
+    }
 }

@@ -113,7 +113,6 @@
     <string name="app_backup_search">Search app name or package</string>
     <string name="app_backup_user">User apps</string>
     <string name="app_backup_system">System apps</string>
-    <string name="app_backup_select_all">Select / deselect listed apps</string>
     <string name="app_backup_save">Back up selected apps</string>
     <string name="app_backup_save_count">Back up selected apps (%1$d)</string>
     <string name="app_backup_install">Install backup file</string>
@@ -131,4 +130,5 @@
     <string name="app_install_cancelled">Installation cancelled.</string>
     <string name="app_install_confirmation_failed">Cannot open the Android installation confirmation screen.</string>
     <string name="app_backup_destination">Destination: Internal storage/backups/apps</string>
+    <string name="app_backup_details" translatable="false">%1$s\n%2$s</string>
 </resources>
