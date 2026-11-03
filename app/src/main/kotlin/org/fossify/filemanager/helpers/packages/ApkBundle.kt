@@ -47,9 +47,18 @@ object ApkBundle {
     }
 
     fun fileName(label: String, version: String, split: Boolean): String {
-        val name = "$label $version".replace(Regex("[\\p{Cntrl}/\\\\:*?\"<>|]"), "_").trim().take(NAME_LENGTH)
-        return name.ifBlank { "application" } + if (split) ".apk+" else ".apk"
+        val name = "$label $version".replace(Regex("[\\p{Cntrl}/\\\\:*?\"<>|]"), "_").trim()
+        val bounded = StringBuilder()
+        var bytes = 0
+        for (point in name.codePoints().toArray()) {
+            val text = String(Character.toChars(point))
+            val size = text.toByteArray(Charsets.UTF_8).size
+            if (bytes + size > NAME_BYTES) break
+            bounded.append(text)
+            bytes += size
+        }
+        return bounded.toString().ifBlank { "application" } + if (split) ".apk+" else ".apk"
     }
 
-    private const val NAME_LENGTH = 120
+    private const val NAME_BYTES = 180
 }

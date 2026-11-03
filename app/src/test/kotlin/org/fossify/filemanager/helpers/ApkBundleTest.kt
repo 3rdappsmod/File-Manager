@@ -58,6 +58,16 @@ class ApkBundleTest {
         assertEquals("App 1.apk", ApkBundle.fileName("App", "1", false))
     }
 
+    @Test fun limitsKoreanAndEmojiNamesByUtf8Bytes() {
+        for (label in listOf("한".repeat(120), "😀".repeat(120), "a" + "😀".repeat(120))) {
+            val name = ApkBundle.fileName(label, "1.0", true)
+            assertTrue(name.toByteArray(Charsets.UTF_8).size <= 185)
+            assertTrue(name.endsWith(".apk+"))
+            assertFalse(name.contains('\uFFFD'))
+            assertEquals(name, String(name.toByteArray(Charsets.UTF_8), Charsets.UTF_8))
+        }
+    }
+
     private fun archive(vararg names: String, check: (ZipFile) -> Unit) {
         val file = File.createTempFile("apk-bundle-test", ".zip")
         try {
