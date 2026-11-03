@@ -105,4 +105,30 @@
     <string name="feature_default_csv">Edit CSV and TSV</string>
     <string name="feature_default_ebook">E-books</string>
     <string name="storage_permission_settings_unavailable">Cannot open storage access settings. Check storage permissions in your device settings.</string>
+
+    <!-- Application backups and split APK installation -->
+    <string name="app_backup_title">Application backup</string>
+    <string name="app_backup_description">Back up installation files only; app data is not included. System apps and device-specific splits may not install on other devices.</string>
+    <string name="app_backup_category">App category</string>
+    <string name="app_backup_search">Search app name or package</string>
+    <string name="app_backup_user">User apps</string>
+    <string name="app_backup_system">System apps</string>
+    <string name="app_backup_select_all">Select / deselect listed apps</string>
+    <string name="app_backup_save">Back up selected apps</string>
+    <string name="app_backup_save_count">Back up selected apps (%1$d)</string>
+    <string name="app_backup_install">Install backup file</string>
+    <string name="app_backup_cancel_confirm">Stop the current operation and leave? Unfinished backup files will be removed.</string>
+    <string name="app_backup_progress">Processing %1$d / %2$d: %3$s</string>
+    <string name="app_backup_result">Backup complete. Successful: %1$d; failed: %2$d. Tap to view errors.</string>
+    <string name="app_backup_app_count">Apps: %1$d</string>
+    <string name="app_backup_errors">Backup errors</string>
+    <string name="app_install_preparing">Preparing installation files…</string>
+    <string name="app_install_confirm">Install</string>
+    <string name="app_install_ready">Ready to install. Android will ask you to confirm the app installation.</string>
+    <string name="app_install_failed">Installation failed: %1$s</string>
+    <string name="app_install_permission">Allow installation from this file manager in system settings, then try again.</string>
+    <string name="app_install_success">Installation completed.</string>
+    <string name="app_install_cancelled">Installation cancelled.</string>
+    <string name="app_install_confirmation_failed">Cannot open the Android installation confirmation screen.</string>
+    <string name="app_backup_destination">Destination: Internal storage/backups/apps</string>
 </resources>

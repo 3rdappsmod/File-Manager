@@ -1,6 +1,9 @@
 package org.fossify.filemanager.helpers
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.Intent
+import org.fossify.filemanager.activities.PackageInstallActivity
 import android.content.ActivityNotFoundException
 import androidx.core.net.toUri
 import androidx.appcompat.app.AlertDialog
@@ -25,7 +28,9 @@ class DefaultAppLauncher(private val activity: Activity) {
     fun open(path: String, forcedMime: String, forceChooser: Boolean, onOpened: () -> Unit) {
         ensureBackgroundThread {
             try {
-                prepare(path, forcedMime, forceChooser, onOpened)
+                if (forcedMime.isNotEmpty() || !openApkBundle(path, onOpened)) {
+                    prepare(path, forcedMime, forceChooser, onOpened)
+                }
             } catch (exception: IllegalArgumentException) {
                 activity.runOnUiThread { activity.showErrorToast(exception) }
             } catch (exception: SecurityException) {
@@ -70,6 +75,25 @@ class DefaultAppLauncher(private val activity: Activity) {
                 openResolved(feature, path, targets, forceChooser, onOpened)
             }
         }
+    }
+
+    private fun openApkBundle(path: String, onOpened: () -> Unit): Boolean {
+        val name = if (path.startsWith("content://")) activity.getFilenameFromUri(path.toUri()) else path
+        if (!name.endsWith(".apk+", true)) return false
+        val uri = activity.ensurePublicUri(path, BuildConfig.APPLICATION_ID)
+        activity.runOnUiThread {
+            if (!activity.isFinishing && !activity.isDestroyed) {
+                if (uri == null) activity.toast(R.string.feature_default_open_failed) else {
+                    activity.startActivity(Intent(activity, PackageInstallActivity::class.java).apply {
+                        data = uri
+                        clipData = ClipData.newRawUri("APK+", uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    })
+                    onOpened()
+                }
+            }
+        }
+        return true
     }
 
     private fun attachOriginalPath(targets: List<DefaultAppTarget>, path: String) {

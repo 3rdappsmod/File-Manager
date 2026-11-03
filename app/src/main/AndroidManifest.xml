@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:installLocation="auto">
 
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- The user-selected APK backup list must include non-launchable system and user packages.
+         Intent-based queries cannot enumerate these. No installed-app inventory is sent off-device. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -36,6 +41,13 @@
         android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/AppTheme">
+
+        <activity android:name=".activities.AppBackupActivity"
+            android:exported="false" android:label="@string/app_backup_title" />
+        <activity android:name=".activities.PackageInstallActivity"
+            android:exported="false" android:label="@string/app_backup_install" />
+        <activity android:name=".activities.PackageInstallResultActivity"
+            android:exported="false" android:label="@string/app_backup_install" />
 
         <activity
             android:name=".activities.DefaultAppsActivity"
