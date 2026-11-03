@@ -19,13 +19,16 @@ import org.fossify.filemanager.helpers.packages.PackageInstallModel
 class PackageInstallActivity : SimpleActivity() {
     private val binding by viewBinding(ActivityPackageInstallBinding::inflate)
     private val model by lazy { ViewModelProvider(this)[PackageInstallModel::class.java] }
+    private var installWhenReady = false
     private val permission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        if (packageManager.canRequestPackageInstalls()) commit()
+        installWhenReady = packageManager.canRequestPackageInstalls()
+        if (installWhenReady) commitIfReady()
         else binding.installStatus.setText(R.string.app_install_permission)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        installWhenReady = savedInstanceState?.getBoolean("install_when_ready") == true
         setContentView(binding.root)
         setupEdgeToEdge(padBottomSystem = listOf(binding.installContent))
         val uri = intent.data
@@ -43,6 +46,7 @@ class PackageInstallActivity : SimpleActivity() {
             }
             if (!state.ready && state.error == null) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            if (installWhenReady) commitIfReady()
         }
         binding.installConfirm.setOnClickListener { requestInstall() }
         model.prepare(uri)
@@ -52,6 +56,15 @@ class PackageInstallActivity : SimpleActivity() {
         super.onResume()
         setupTopAppBar(binding.installAppbar, NavigationIcon.Arrow)
         updateTextColors(binding.installContent)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("install_when_ready", installWhenReady)
+        super.onSaveInstanceState(outState)
+    }
+
+    private fun commitIfReady() {
+        if (model.state.value?.ready == true && !isFinishing) commit()
     }
 
     private fun requestInstall() {
@@ -70,6 +83,7 @@ class PackageInstallActivity : SimpleActivity() {
 
     @Suppress("TooGenericExceptionCaught")
     private fun commit() {
+        installWhenReady = false
         binding.installConfirm.isEnabled = false
         try {
             model.commit()
